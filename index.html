@@ -115,16 +115,18 @@
 </head>
 <body>
 
-<div id="gate" class="gate">
+<div id="login" class="gate">
   <div style="font-family:'Roboto Slab',serif;font-size:20px;">🔐 Libreta Hipoteca</div>
-  <input id="gate-input" type="password" placeholder="Código de acceso" />
-  <button id="gate-btn">Entrar</button>
-  <div id="gate-error" style="color:#9C4221;font-size:13px;display:none;">Código incorrecto</div>
-</div>
 
-<div id="whoami" class="gate" hidden>
-  <div style="font-family:'Roboto Slab',serif;font-size:20px;">¿Quién eres?</div>
-  <div id="whoami-buttons" style="display:flex;flex-direction:column;gap:8px;width:220px;"></div>
+  <div id="login-step1" style="display:flex;flex-direction:column;gap:8px;width:240px;"></div>
+
+  <div id="login-step2" hidden style="display:flex;flex-direction:column;gap:10px;width:240px;align-items:center;">
+    <div id="login-nombre-elegido" style="font-weight:600;"></div>
+    <input id="login-clave" type="password" placeholder="Tu clave" inputmode="numeric" />
+    <button id="login-btn">Entrar</button>
+    <button class="cambiar-rol" id="login-volver-btn">‹ Elegir otro usuario</button>
+    <div id="login-error" style="color:#9C4221;font-size:13px;display:none;">Clave incorrecta</div>
+  </div>
 </div>
 
 <div id="loading" class="loading" hidden>Abriendo la libreta…</div>
@@ -276,7 +278,7 @@
       </div>
 
       <div class="footer">
-        Datos compartidos entre quienes tengan el enlace y el código de acceso.
+        Datos privados de acceso individual con usuario y clave.
         · <button class="cambiar-rol" id="cambiar-rol-btn">Cambiar usuario</button>
       </div>
     </div>
@@ -293,25 +295,29 @@ const firebaseConfig = {
   projectId: "hipoteca-hermanos",
   storageBucket: "hipoteca-hermanos.firebasestorage.app",
   messagingSenderId: "618401100507",
-  appId: "1:618401100507:web:350c97fb88f3b155ded2fe"
+  appId: "1:618401100507:web:350c97fb88f3b155ded2fe",
 };
-
-// Código de acceso simple (cámbialo por el que quieras). No es seguridad
-// real, solo evita que alguien que no tiene el código entre por curiosidad.
-const CODIGO_ACCESO = "hermanos2026";
 
 // ============================================================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import {
   getFirestore, collection, doc, addDoc, updateDoc, deleteDoc,
-  onSnapshot, setDoc, getDoc, query, orderBy
+  onSnapshot, setDoc, getDoc, query, orderBy, where
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import {
   getStorage, ref, uploadBytes, getDownloadURL
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
-// Firebase se inicializa DESPUÉS de pasar el código de acceso (dentro de initApp),
-// para que el botón "Entrar" nunca dependa de que Firebase esté bien configurado.
+// Usuarios con su propia clave individual. hermanoIdx debe coincidir con
+// la posición de su nombre dentro de config.hermanos (0, 1, 2...).
+const USUARIOS = [
+  { nombre: "Cristian Reyna", clave: "73427943", tipo: "hermano", hermanoIdx: 0 },
+  { nombre: "Marlon Reyna", clave: "45967179", tipo: "hermano", hermanoIdx: 1 },
+  { nombre: "Administrador", clave: "47105956", tipo: "encargado" },
+];
+
+// Firebase se inicializa DESPUÉS de iniciar sesión (dentro de initApp),
+// para que el login nunca dependa de que Firebase esté bien configurado.
 let db, storage;
 
 const MOTIVOS = {
@@ -336,7 +342,7 @@ async function subirConstancia(file, hermanoNombre, fechaPago) {
   return { url, nombre: nombreArchivo };
 }
 
-const DEFAULT_CONFIG = { hermanos: ["Hermano 1", "Hermano 2", "Hermano 3"], cuotaInicial: 1131, cuotaActual: 1080 };
+const DEFAULT_CONFIG = { hermanos: ["Cristian Reyna", "Marlon Reyna"], cuotaInicial: 1131, cuotaActual: 1080 };
 let config = DEFAULT_CONFIG;
 let yapes = [];
 let pagosBanco = [];
@@ -382,19 +388,65 @@ function showError(msg) {
   setTimeout(() => (box.style.display = "none"), 4000);
 }
 
-// ---------- ACCESS GATE ----------
-document.getElementById("gate-btn").addEventListener("click", tryEnter);
-document.getElementById("gate-input").addEventListener("keydown", (e) => { if (e.key === "Enter") tryEnter(); });
-function tryEnter() {
-  const val = document.getElementById("gate-input").value;
-  if (val === CODIGO_ACCESO) {
-    document.getElementById("gate").hidden = true;
+// ---------- LOGIN (usuario + clave) ----------
+let usuarioSeleccionado = null;
+
+function pintarLoginStep1() {
+  const box = document.getElementById("login-step1");
+  box.innerHTML = "";
+  USUARIOS.forEach((u) => {
+    const b = document.createElement("button");
+    b.className = "whoami-btn" + (u.tipo === "encargado" ? " encargado" : "");
+    b.textContent = u.nombre;
+    b.addEventListener("click", () => {
+      usuarioSeleccionado = u;
+      document.getElementById("login-nombre-elegido").textContent = u.nombre;
+      document.getElementById("login-step1").hidden = true;
+      document.getElementById("login-step2").hidden = false;
+      document.getElementById("login-error").style.display = "none";
+      document.getElementById("login-clave").value = "";
+      document.getElementById("login-clave").focus();
+    });
+    box.appendChild(b);
+  });
+}
+pintarLoginStep1();
+
+document.getElementById("login-volver-btn").addEventListener("click", () => {
+  usuarioSeleccionado = null;
+  document.getElementById("login-step2").hidden = true;
+  document.getElementById("login-step1").hidden = false;
+});
+
+document.getElementById("login-btn").addEventListener("click", tryLogin);
+document.getElementById("login-clave").addEventListener("keydown", (e) => { if (e.key === "Enter") tryLogin(); });
+
+function tryLogin() {
+  if (!usuarioSeleccionado) return;
+  const val = document.getElementById("login-clave").value;
+  if (val === usuarioSeleccionado.clave) {
+    const nuevoRol = usuarioSeleccionado.tipo === "hermano"
+      ? { tipo: "hermano", hermanoIdx: usuarioSeleccionado.hermanoIdx, nombre: usuarioSeleccionado.nombre }
+      : { tipo: "encargado", nombre: usuarioSeleccionado.nombre };
+    guardarRol(nuevoRol);
+    document.getElementById("login").hidden = true;
     document.getElementById("loading").hidden = false;
     initApp();
   } else {
-    document.getElementById("gate-error").style.display = "block";
+    document.getElementById("login-error").style.display = "block";
   }
 }
+
+// Arranque: si ya había un usuario guardado en este dispositivo, saltar el login
+(function bootstrap() {
+  const rolGuardado = cargarRol();
+  if (rolGuardado) {
+    rol = rolGuardado;
+    document.getElementById("login").hidden = true;
+    document.getElementById("loading").hidden = false;
+    initApp();
+  }
+})();
 
 // ---------- INIT ----------
 async function initApp() {
@@ -436,56 +488,29 @@ async function initApp() {
     if (snap.exists()) { config = { ...DEFAULT_CONFIG, ...snap.data() }; renderAll(); }
   });
 
-  onSnapshot(query(collection(db, "yapes"), orderBy("fechaPago", "desc")), (snap) => {
+  // Si es un hermano, la consulta a Firestore trae SOLO sus propios registros
+  // (filtrado en el servidor, no solo escondido en la pantalla).
+  const yapesQuery = rol.tipo === "hermano"
+    ? query(collection(db, "yapes"), where("hermano", "==", rol.hermanoIdx), orderBy("fechaPago", "desc"))
+    : query(collection(db, "yapes"), orderBy("fechaPago", "desc"));
+
+  onSnapshot(yapesQuery, (snap) => {
     yapes = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     renderAll();
-  }, () => showError("No se pudo leer 'yapes'. Revisa las reglas de Firestore."));
+  }, () => showError("No se pudo leer los pagos. Revisa las reglas de Firestore."));
 
-  onSnapshot(query(collection(db, "pagosBanco"), orderBy("fecha", "desc")), (snap) => {
-    pagosBanco = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-    renderAll();
-  }, () => showError("No se pudo leer 'pagosBanco'. Revisa las reglas de Firestore."));
+  // Los pagos al banco son solo del encargado: un hermano ni siquiera los pide.
+  if (rol.tipo !== "hermano") {
+    onSnapshot(query(collection(db, "pagosBanco"), orderBy("fecha", "desc")), (snap) => {
+      pagosBanco = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      renderAll();
+    }, () => showError("No se pudo leer 'pagosBanco'. Revisa las reglas de Firestore."));
+  }
 
   document.getElementById("loading").hidden = true;
-
-  rol = cargarRol();
-  if (rol) {
-    aplicarRol();
-    document.getElementById("app").hidden = false;
-    renderAll();
-  } else {
-    mostrarWhoami();
-  }
-}
-
-function mostrarWhoami() {
-  const box = document.getElementById("whoami-buttons");
-  box.innerHTML = "";
-  config.hermanos.forEach((nombre, idx) => {
-    const b = document.createElement("button");
-    b.className = "whoami-btn";
-    b.textContent = nombre;
-    b.addEventListener("click", () => {
-      guardarRol({ tipo: "hermano", hermanoIdx: idx });
-      document.getElementById("whoami").hidden = true;
-      aplicarRol();
-      document.getElementById("app").hidden = false;
-      renderAll();
-    });
-    box.appendChild(b);
-  });
-  const bEncargado = document.createElement("button");
-  bEncargado.className = "whoami-btn encargado";
-  bEncargado.textContent = "Yo (encargado/a del crédito)";
-  bEncargado.addEventListener("click", () => {
-    guardarRol({ tipo: "encargado" });
-    document.getElementById("whoami").hidden = true;
-    aplicarRol();
-    document.getElementById("app").hidden = false;
-    renderAll();
-  });
-  box.appendChild(bEncargado);
-  document.getElementById("whoami").hidden = false;
+  aplicarRol();
+  document.getElementById("app").hidden = false;
+  renderAll();
 }
 
 document.getElementById("cambiar-rol-btn").addEventListener("click", () => {
@@ -601,7 +626,9 @@ function renderAll() {
   const maxTotal = Math.max(1, ...totalesPorHermano);
   const grid = document.getElementById("hermanos-grid");
   grid.innerHTML = "";
-  config.hermanos.forEach((nombre, idx) => {
+  const indicesAMostrar = rol.tipo === "hermano" ? [rol.hermanoIdx] : config.hermanos.map((_, i) => i);
+  indicesAMostrar.forEach((idx) => {
+    const nombre = config.hermanos[idx];
     const card = document.createElement("div");
     card.className = "hermano-card";
     card.innerHTML = editingConfig
