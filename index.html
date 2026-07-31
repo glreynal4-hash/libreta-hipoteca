@@ -371,7 +371,7 @@ function aplicarRol() {
   document.getElementById("tab-btn-banco").hidden = esHermano;
   document.getElementById("edit-config-btn").hidden = esHermano;
   document.getElementById("header-title").textContent = esHermano
-    ? `Cuenta de ${rol.nombre}`
+    ? `Cuenta: ${rol.nombre}`
     : "Cuenta entre 3 hermanos";
   if (esHermano) {
     document.getElementById("tab-yapes").hidden = false;
@@ -639,7 +639,7 @@ function renderAll() {
   grid.innerHTML = "";
   const indicesAMostrar = rol.tipo === "hermano" ? [rol.hermanoIdx] : config.hermanos.map((_, i) => i);
   indicesAMostrar.forEach((idx) => {
-    const nombre = config.hermanos[idx];
+    const nombre = (rol.tipo === "hermano") ? rol.nombre : config.hermanos[idx];
     const card = document.createElement("div");
     card.className = "hermano-card";
     card.innerHTML = editingConfig
@@ -661,8 +661,8 @@ function renderAll() {
   });
 
   const col = document.getElementById("yape-hermano-col");
-  if (rol && rol.tipo === "hermano") {
-    col.innerHTML = `<label class="field-label">Hermano</label><div class="hermano-fijo">${escapeHtml(config.hermanos[rol.hermanoIdx] || "—")}</div>`;
+  if (rol.tipo === "hermano") {
+    col.innerHTML = `<label class="field-label">Hermano</label><div class="hermano-fijo">${escapeHtml(rol.nombre)}</div>`;
   } else {
     if (!document.getElementById("yape-hermano")) {
       col.innerHTML = `<label class="field-label">Hermano</label><select id="yape-hermano"></select>`;
@@ -701,7 +701,7 @@ function renderAll() {
       row.innerHTML = `
         <div class="ledger-date">${formatFecha(y.fechaPago)}</div>
         <div class="ledger-mid">
-          <div class="ledger-hermano">${escapeHtml(config.hermanos[y.hermano] || "—")}</div>
+          <div class="ledger-hermano">${escapeHtml(rol.tipo === "hermano" ? rol.nombre : (config.hermanos[y.hermano] || "—"))}</div>
           <span class="motivo-tag" style="color:${m.color};border-color:${m.color}">${m.label}</span>
           ${medio ? `<span class="medio-tag">${medio}</span>` : ""}
           ${y.nota ? `<span class="nota">${escapeHtml(y.nota)}</span>` : ""}
