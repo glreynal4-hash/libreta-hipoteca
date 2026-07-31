@@ -105,12 +105,28 @@
   .del-btn{background:transparent;border:none;color:#C08A6A;cursor:pointer;padding:4px;flex-shrink:0;font-size:14px;}
   .footer{margin-top:16px;font-size:11px;color:#A69A88;text-align:center;}
   .gate{min-height:100vh;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;}
-  .gate input{width:220px;text-align:center;font-family:'IBM Plex Mono',monospace;font-size:16px;letter-spacing:.1em;}
+  .gate input{width:min(220px,80vw);text-align:center;font-family:'IBM Plex Mono',monospace;font-size:16px;letter-spacing:.1em;}
   .gate button{background:var(--brass);color:var(--paper);border:none;border-radius:6px;padding:10px 18px;
     cursor:pointer;font-weight:600;}
   .loading{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'IBM Plex Mono',monospace;
     color:#5B4A3A;}
   [hidden]{display:none !important;}
+
+  /* ---------- RESPONSIVE (celular) ---------- */
+  @media (max-width: 640px) {
+    .wrap{padding:12px 8px;}
+    .content{padding:16px 14px 16px;}
+    h1{font-size:19px;}
+    .perforation{width:14px;}
+    .hole{width:5px;height:5px;}
+    .form-row{grid-template-columns:1fr;}
+    .cuota-card{gap:10px;padding:14px;}
+    .cuota-value{font-size:17px;}
+    .totals-row{grid-template-columns:repeat(2,1fr);}
+    .hermanos-grid{grid-template-columns:1fr;}
+    .header{flex-wrap:wrap;gap:8px;}
+    .ledger-row{gap:6px;}
+  }
 </style>
 </head>
 <body>
@@ -118,9 +134,9 @@
 <div id="login" class="gate">
   <div style="font-family:'Roboto Slab',serif;font-size:20px;">🔐 Libreta Hipoteca</div>
 
-  <div id="login-step1" style="display:flex;flex-direction:column;gap:8px;width:240px;"></div>
+  <div id="login-step1" style="display:flex;flex-direction:column;gap:8px;width:min(240px,86vw);"></div>
 
-  <div id="login-step2" hidden style="display:flex;flex-direction:column;gap:10px;width:240px;align-items:center;">
+  <div id="login-step2" hidden style="display:flex;flex-direction:column;gap:10px;width:min(240px,86vw);align-items:center;">
     <div id="login-nombre-elegido" style="font-weight:600;"></div>
     <input id="login-clave" type="password" placeholder="Tu clave" inputmode="numeric" />
     <button id="login-btn">Entrar</button>
@@ -218,6 +234,7 @@
                 <option value="reduccion_cuota">Importe Reducción de Cuota</option>
                 <option value="reduccion_plazo">Importe Reducción de Plazo</option>
                 <option value="cuota_mensual">Importe Cuota Mensual</option>
+                <option value="otros">Otros</option>
               </select>
             </div>
           </div>
@@ -239,6 +256,7 @@
             <input id="yape-nota" placeholder="Nota (opcional)" style="grid-column:1/-1" />
           </div>
           <button class="add-btn" id="yape-add-btn">Registrar pago</button>
+          <button class="cambiar-rol" id="yape-cancelar-edicion" hidden style="margin-top:4px;">Cancelar edición</button>
         </div>
 
         <div class="section-label">📅 HISTORIAL DE PAGOS</div>
@@ -281,6 +299,7 @@
             </div>
           </div>
           <button class="add-btn" id="banco-add-btn">Agregar pago</button>
+          <button class="cambiar-rol" id="banco-cancelar-edicion" hidden style="margin-top:4px;">Cancelar edición</button>
         </div>
 
         <div class="section-label">📅 HISTORIAL DE PAGOS AL BANCO</div>
@@ -322,10 +341,22 @@ const USUARIOS = [
   { nombre: "Marlon Reyna", clave: "45967179", tipo: "hermano", hermanoIdx: 1 },
   { nombre: "Gustavo Reyna", clave: "47105956", tipo: "encargado" },
 ];
-// Nombres de hermanos, siempre en el mismo orden que sus hermanoIdx.
+// Nombres de hermanos + el administrador (para que también pueda
+// registrarse a sí mismo como aportante en el combo del formulario).
 const NOMBRES_HERMANOS = USUARIOS.filter((u) => u.tipo === "hermano")
   .sort((a, b) => a.hermanoIdx - b.hermanoIdx)
-  .map((u) => u.nombre);
+  .map((u) => u.nombre)
+  .concat(USUARIOS.filter((u) => u.tipo === "encargado").map((u) => u.nombre));
+const IDX_ADMIN_APORTANTE = NOMBRES_HERMANOS.length - 1;
+
+// El nombre del usuario actual SIEMPRE se resuelve desde USUARIOS (no desde
+// lo guardado en el navegador), así que si cambias un nombre en el código,
+// se refleja al instante sin pedirle a nadie que vuelva a iniciar sesión.
+function nombreActual() {
+  if (rol.tipo === "hermano") return NOMBRES_HERMANOS[rol.hermanoIdx] || `Hermano ${rol.hermanoIdx + 1}`;
+  const admin = USUARIOS.find((u) => u.tipo === "encargado");
+  return admin ? admin.nombre : "Administrador";
+}
 
 // Firebase se inicializa DESPUÉS de iniciar sesión (dentro de initApp),
 // para que el login nunca dependa de que Firebase esté bien configurado.
@@ -335,6 +366,7 @@ const MOTIVOS = {
   reduccion_cuota: { label: "Reducción de cuota", color: "#8A5A2B" },
   reduccion_plazo: { label: "Reducción de plazo", color: "#3D6B54" },
   cuota_mensual: { label: "Cuota mensual", color: "#3A6EA5" },
+  otros: { label: "Otros", color: "#6B6459" },
   // Alias para registros guardados antes de este cambio (esquema anterior)
   prepago: { label: "Reducción de cuota", color: "#8A5A2B" },
   cuota: { label: "Cuota mensual", color: "#3A6EA5" },
@@ -379,8 +411,8 @@ function aplicarRol() {
   document.getElementById("tab-btn-banco").hidden = esHermano;
   document.getElementById("edit-config-btn").hidden = esHermano;
   document.getElementById("header-title").textContent = esHermano
-    ? `Cuenta: ${rol.nombre}`
-    : `Administrador: ${rol.nombre}`;
+    ? `Cuenta: ${nombreActual()}`
+    : `Administrador: ${nombreActual()}`;
   if (esHermano) {
     document.getElementById("tab-yapes").hidden = false;
     document.getElementById("tab-banco").hidden = true;
@@ -401,7 +433,15 @@ function formatFecha(iso) {
 }
 function showError(msg) {
   const box = document.getElementById("error-box");
-  document.getElementById("error-text").textContent = msg;
+  const span = document.getElementById("error-text");
+  const urlMatch = msg.match(/https?:\/\/\S+/);
+  if (urlMatch) {
+    const url = urlMatch[0].replace(/[).,]+$/, "");
+    span.innerHTML = escapeHtml(msg.replace(url, "")) + ` <a href="${url}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;">Abrir enlace para arreglarlo</a>`;
+    box.style.display = "flex";
+    return; // no se oculta sola: el link hay que poder tocarlo con calma
+  }
+  span.textContent = msg;
   box.style.display = "flex";
   setTimeout(() => (box.style.display = "none"), 4000);
 }
@@ -444,8 +484,8 @@ function tryLogin() {
   const val = document.getElementById("login-clave").value;
   if (val === usuarioSeleccionado.clave) {
     const nuevoRol = usuarioSeleccionado.tipo === "hermano"
-      ? { tipo: "hermano", hermanoIdx: usuarioSeleccionado.hermanoIdx, nombre: usuarioSeleccionado.nombre }
-      : { tipo: "encargado", nombre: usuarioSeleccionado.nombre };
+      ? { tipo: "hermano", hermanoIdx: usuarioSeleccionado.hermanoIdx }
+      : { tipo: "encargado" };
     guardarRol(nuevoRol);
     document.getElementById("login").hidden = true;
     document.getElementById("loading").hidden = false;
@@ -515,7 +555,7 @@ async function initApp() {
   onSnapshot(yapesQuery, (snap) => {
     yapes = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     renderAll();
-  }, () => showError("No se pudo leer los pagos. Revisa las reglas de Firestore."));
+  }, (err) => { showError("Error al leer pagos: " + err.message); console.error(err); });
 
   // Los pagos al banco son solo del encargado: un hermano ni siquiera los pide.
   if (rol.tipo !== "hermano") {
@@ -559,34 +599,75 @@ document.getElementById("edit-config-btn").addEventListener("click", async () =>
   renderAll();
 });
 
-// ---------- ADD YAPE ----------
+// ---------- ADD / EDIT YAPE ----------
+let yapeEditId = null;
+
+function editarYape(id) {
+  const y = yapes.find((x) => x.id === id);
+  if (!y) return;
+  yapeEditId = id;
+  document.getElementById("yape-motivo").value = y.motivo === "prepago" ? "reduccion_cuota" : (y.motivo === "cuota" ? "cuota_mensual" : y.motivo);
+  document.getElementById("yape-medio").value = y.medioPago || "yape";
+  document.getElementById("yape-monto").value = y.monto;
+  document.getElementById("yape-fecha-pago").value = y.fechaPago;
+  document.getElementById("yape-nota").value = y.nota || "";
+  const sel = document.getElementById("yape-hermano");
+  if (sel) sel.value = y.hermano;
+  const btn = document.getElementById("yape-add-btn");
+  btn.textContent = "Guardar cambios";
+  document.getElementById("yape-cancelar-edicion").hidden = false;
+  btn.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+document.getElementById("yape-cancelar-edicion").addEventListener("click", () => {
+  yapeEditId = null;
+  document.getElementById("yape-monto").value = "";
+  document.getElementById("yape-nota").value = "";
+  document.getElementById("yape-imagen").value = "";
+  document.getElementById("yape-add-btn").textContent = "Registrar pago";
+  document.getElementById("yape-cancelar-edicion").hidden = true;
+});
+
 document.getElementById("yape-add-btn").addEventListener("click", async () => {
   const monto = Number(document.getElementById("yape-monto").value);
   if (!monto || monto <= 0) return;
-  const hermanoIdx = rol && rol.tipo === "hermano" ? rol.hermanoIdx : Number(document.getElementById("yape-hermano").value);
+  const hermanoIdx = rol.tipo === "hermano" ? rol.hermanoIdx : Number(document.getElementById("yape-hermano").value);
   const fechaPago = document.getElementById("yape-fecha-pago").value;
   const fileInput = document.getElementById("yape-imagen");
   const file = fileInput.files[0] || null;
   const btn = document.getElementById("yape-add-btn");
+  const editando = !!yapeEditId;
 
   btn.disabled = true;
-  btn.textContent = file ? "Subiendo constancia…" : "Guardando…";
+  btn.textContent = file ? "Subiendo constancia…" : (editando ? "Guardando cambios…" : "Guardando…");
 
   try {
-    const { url, nombre } = await subirConstancia(file, NOMBRES_HERMANOS[hermanoIdx] || "hermano", fechaPago);
-    const nuevo = {
+    let imagenUrl = null, imagenNombre = null;
+    if (file) {
+      const r = await subirConstancia(file, NOMBRES_HERMANOS[hermanoIdx] || "hermano", fechaPago);
+      imagenUrl = r.url; imagenNombre = r.nombre;
+    } else if (editando) {
+      const existente = yapes.find((y) => y.id === yapeEditId);
+      imagenUrl = existente?.imagenUrl || null;
+      imagenNombre = existente?.imagenNombre || null;
+    }
+    const datos = {
       hermano: hermanoIdx,
       medioPago: document.getElementById("yape-medio").value,
       motivo: document.getElementById("yape-motivo").value,
       fechaPago,
-      fechaRegistro: new Date().toISOString(),
       monto,
       nota: document.getElementById("yape-nota").value.trim(),
-      estado: "pendiente",
-      imagenUrl: url,
-      imagenNombre: nombre,
+      imagenUrl,
+      imagenNombre,
     };
-    await addDoc(collection(db, "yapes"), nuevo);
+    if (editando) {
+      await updateDoc(doc(db, "yapes", yapeEditId), datos);
+      yapeEditId = null;
+      document.getElementById("yape-cancelar-edicion").hidden = true;
+    } else {
+      await addDoc(collection(db, "yapes"), { ...datos, fechaRegistro: new Date().toISOString(), estado: "pendiente" });
+    }
     document.getElementById("yape-monto").value = "";
     document.getElementById("yape-nota").value = "";
     fileInput.value = "";
@@ -598,7 +679,34 @@ document.getElementById("yape-add-btn").addEventListener("click", async () => {
   }
 });
 
-// ---------- ADD PAGO BANCO ----------
+// ---------- ADD / EDIT PAGO BANCO ----------
+let bancoEditId = null;
+
+function editarBanco(id) {
+  const p = pagosBanco.find((x) => x.id === id);
+  if (!p) return;
+  bancoEditId = id;
+  document.getElementById("banco-fecha").value = p.fecha;
+  document.getElementById("banco-tipo").value = p.tipo;
+  document.getElementById("banco-monto").value = p.monto;
+  document.getElementById("banco-capital").value = p.montoCapital ?? "";
+  document.getElementById("banco-nota").value = p.nota || "";
+  const btn = document.getElementById("banco-add-btn");
+  btn.textContent = "Guardar cambios";
+  document.getElementById("banco-cancelar-edicion").hidden = false;
+  btn.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+document.getElementById("banco-cancelar-edicion").addEventListener("click", () => {
+  bancoEditId = null;
+  document.getElementById("banco-monto").value = "";
+  document.getElementById("banco-capital").value = "";
+  document.getElementById("banco-nota").value = "";
+  document.getElementById("banco-imagen").value = "";
+  document.getElementById("banco-add-btn").textContent = "Agregar pago";
+  document.getElementById("banco-cancelar-edicion").hidden = true;
+});
+
 document.getElementById("banco-add-btn").addEventListener("click", async () => {
   const monto = Number(document.getElementById("banco-monto").value);
   if (!monto || monto <= 0) return;
@@ -607,22 +715,37 @@ document.getElementById("banco-add-btn").addEventListener("click", async () => {
   const fileInput = document.getElementById("banco-imagen");
   const file = fileInput.files[0] || null;
   const btn = document.getElementById("banco-add-btn");
+  const editando = !!bancoEditId;
 
   btn.disabled = true;
-  btn.textContent = file ? "Subiendo constancia…" : "Guardando…";
+  btn.textContent = file ? "Subiendo constancia…" : (editando ? "Guardando cambios…" : "Guardando…");
 
   try {
-    const { url, nombre } = await subirConstancia(file, "banco", fecha);
-    const nuevo = {
+    let imagenUrl = null, imagenNombre = null;
+    if (file) {
+      const r = await subirConstancia(file, "banco", fecha);
+      imagenUrl = r.url; imagenNombre = r.nombre;
+    } else if (editando) {
+      const existente = pagosBanco.find((p) => p.id === bancoEditId);
+      imagenUrl = existente?.imagenUrl || null;
+      imagenNombre = existente?.imagenNombre || null;
+    }
+    const datos = {
       fecha,
       monto,
       tipo: document.getElementById("banco-tipo").value,
       montoCapital: capitalVal ? Number(capitalVal) : null,
       nota: document.getElementById("banco-nota").value.trim(),
-      imagenUrl: url,
-      imagenNombre: nombre,
+      imagenUrl,
+      imagenNombre,
     };
-    await addDoc(collection(db, "pagosBanco"), nuevo);
+    if (editando) {
+      await updateDoc(doc(db, "pagosBanco", bancoEditId), datos);
+      bancoEditId = null;
+      document.getElementById("banco-cancelar-edicion").hidden = true;
+    } else {
+      await addDoc(collection(db, "pagosBanco"), datos);
+    }
     document.getElementById("banco-monto").value = "";
     document.getElementById("banco-capital").value = "";
     document.getElementById("banco-nota").value = "";
@@ -672,7 +795,12 @@ function renderAll() {
     monto.textContent = formatSoles(totalesPorHermano[idx]);
     const desglose = document.createElement("div");
     desglose.className = "hermano-desglose";
-    desglose.textContent = `Cuota ${formatSoles(desglosePorHermano[idx].cuota)} · Plazo ${formatSoles(desglosePorHermano[idx].plazo)} · Mensual ${formatSoles(desglosePorHermano[idx].mensual)}`;
+    let textoDesglose = `Cuota ${formatSoles(desglosePorHermano[idx].cuota)} · Plazo ${formatSoles(desglosePorHermano[idx].plazo)} · Mensual ${formatSoles(desglosePorHermano[idx].mensual)}`;
+    if (idx === IDX_ADMIN_APORTANTE && rol.tipo !== "hermano") {
+      const totalBancoCard = pagosBanco.reduce((s, p) => s + p.monto, 0);
+      textoDesglose += ` · Directo al banco ${formatSoles(totalBancoCard)}`;
+    }
+    desglose.textContent = textoDesglose;
     const track = document.createElement("div");
     track.className = "bar-track";
     track.innerHTML = `<div class="bar-fill" style="width:${(totalesPorHermano[idx] / maxTotal) * 100}%"></div>`;
@@ -684,7 +812,7 @@ function renderAll() {
 
   const col = document.getElementById("yape-hermano-col");
   if (rol.tipo === "hermano") {
-    col.innerHTML = `<label class="field-label">Hermano</label><div class="hermano-fijo">${escapeHtml(rol.nombre)}</div>`;
+    col.innerHTML = `<label class="field-label">Hermano</label><div class="hermano-fijo">${escapeHtml(nombreActual())}</div>`;
   } else {
     if (!document.getElementById("yape-hermano")) {
       col.innerHTML = `<label class="field-label">Hermano</label><select id="yape-hermano"></select>`;
@@ -723,7 +851,7 @@ function renderAll() {
       row.innerHTML = `
         <div class="ledger-date">${formatFecha(y.fechaPago)}</div>
         <div class="ledger-mid">
-          <div class="ledger-hermano">${escapeHtml(rol.tipo === "hermano" ? rol.nombre : (NOMBRES_HERMANOS[y.hermano] || "—"))}</div>
+          <div class="ledger-hermano">${escapeHtml(rol.tipo === "hermano" ? nombreActual() : (NOMBRES_HERMANOS[y.hermano] || "—"))}</div>
           <span class="motivo-tag" style="color:${m.color};border-color:${m.color}">${m.label}</span>
           ${medio ? `<span class="medio-tag">${medio}</span>` : ""}
           ${y.nota ? `<span class="nota">${escapeHtml(y.nota)}</span>` : ""}
@@ -731,10 +859,12 @@ function renderAll() {
           ${mostrarRegistro ? `<span class="ledger-registro">Registrado el ${formatFecha(fechaReg)}</span>` : ""}
         </div>
         <div class="ledger-monto">${formatSoles(y.monto)}</div>
-        <button class="estado-btn ${y.estado}" data-id="${y.id}" data-action="toggle">
-          ${y.estado === "verificado" ? "✓ Verificado" : "⏳ Pendiente"}
-        </button>
-        <button class="del-btn" data-id="${y.id}" data-action="delete-yape">✕</button>
+        ${rol.tipo === "hermano"
+          ? `<span class="estado-btn ${y.estado}" style="cursor:default;">${y.estado === "verificado" ? "✓ Verificado" : "⏳ Pendiente"}</span>`
+          : `<button class="estado-btn ${y.estado}" data-id="${y.id}" data-action="toggle">${y.estado === "verificado" ? "✓ Verificado" : "⏳ Pendiente"}</button>`
+        }
+        <button class="del-btn" data-id="${y.id}" data-action="edit-yape" title="Editar">✎</button>
+        ${rol.tipo !== "hermano" ? `<button class="del-btn" data-id="${y.id}" data-action="delete-yape" title="Eliminar">✕</button>` : ""}
       `;
       yLedger.appendChild(row);
     });
@@ -767,7 +897,8 @@ function renderAll() {
           ${p.imagenUrl ? `<a class="constancia-link" href="${p.imagenUrl}" target="_blank" rel="noopener">🖼 Ver constancia</a>` : ""}
         </div>
         <div class="ledger-monto">${formatSoles(p.monto)}</div>
-        <button class="del-btn" data-id="${p.id}" data-action="delete-banco">✕</button>
+        <button class="del-btn" data-id="${p.id}" data-action="edit-banco" title="Editar">✎</button>
+        <button class="del-btn" data-id="${p.id}" data-action="delete-banco" title="Eliminar">✕</button>
       `;
       bLedger.appendChild(row);
     });
@@ -780,6 +911,15 @@ document.addEventListener("click", async (e) => {
   if (!btn) return;
   const id = btn.dataset.id;
   const action = btn.dataset.action;
+
+  // Acciones que solo puede hacer el administrador (defensa extra, además de
+  // que estos botones ni siquiera se muestran a un hermano).
+  const soloAdmin = ["toggle", "delete-yape", "delete-banco"];
+  if (soloAdmin.includes(action) && rol.tipo === "hermano") return;
+
+  if (action === "edit-yape") { editarYape(id); return; }
+  if (action === "edit-banco") { editarBanco(id); return; }
+
   try {
     if (action === "toggle") {
       const y = yapes.find((x) => x.id === id);
