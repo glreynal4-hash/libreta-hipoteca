@@ -138,8 +138,9 @@
       <div class="header">
         <div>
           <div class="eyebrow">LIBRETA · CRÉDITO HIPOTECARIO COMPARTIDO</div>
-          <h1>Cuenta entre 3 hermanos</h1>
+          <h1 id="header-title">Cuenta entre 3 hermanos</h1>
         </div>
+        <button class="cambiar-rol" id="cambiar-rol-btn">Cambiar usuario</button>
       </div>
 
       <div class="error" id="error-box"><span id="error-text"></span></div>
@@ -164,7 +165,7 @@
       </div>
 
       <div class="tabs" id="tabs-row">
-        <button class="tab-btn active" data-tab="yapes">📱 Aportes de hermanos</button>
+        <button class="tab-btn active" data-tab="yapes">📱 Aportes</button>
         <button class="tab-btn" data-tab="banco" id="tab-btn-banco">🏦 Pagos al banco</button>
       </div>
 
@@ -183,12 +184,16 @@
             <div class="total-value muted" id="total-pendiente"></div>
           </div>
           <div class="total-box">
-            <div class="total-label">Total prepagos</div>
-            <div class="total-value" id="total-motivo-prepago"></div>
+            <div class="total-label">Reducción de cuota</div>
+            <div class="total-value" id="total-motivo-cuota"></div>
           </div>
           <div class="total-box">
-            <div class="total-label">Total cuota mensual</div>
-            <div class="total-value" id="total-motivo-cuota"></div>
+            <div class="total-label">Reducción de plazo</div>
+            <div class="total-value" id="total-motivo-plazo"></div>
+          </div>
+          <div class="total-box">
+            <div class="total-label">Cuota mensual</div>
+            <div class="total-value" id="total-motivo-mensual"></div>
           </div>
         </div>
 
@@ -210,8 +215,9 @@
             <div class="field-col">
               <label class="field-label">Motivo</label>
               <select id="yape-motivo">
-                <option value="prepago">Importe prepago</option>
-                <option value="cuota">Importe cuota mensual</option>
+                <option value="reduccion_cuota">Importe Reducción de Cuota</option>
+                <option value="reduccion_plazo">Importe Reducción de Plazo</option>
+                <option value="cuota_mensual">Importe Cuota Mensual</option>
               </select>
             </div>
           </div>
@@ -277,10 +283,7 @@
         <div class="ledger" id="banco-ledger"></div>
       </div>
 
-      <div class="footer">
-        Datos privados de acceso individual con usuario y clave.
-        · <button class="cambiar-rol" id="cambiar-rol-btn">Cambiar usuario</button>
-      </div>
+      <div class="footer">Datos privados de acceso individual con usuario y clave.</div>
     </div>
   </div>
 </div>
@@ -321,8 +324,12 @@ const USUARIOS = [
 let db, storage;
 
 const MOTIVOS = {
-  prepago: { label: "Prepago", color: "#8A5A2B" },
-  cuota: { label: "Cuota mensual", color: "#3D6B54" },
+  reduccion_cuota: { label: "Reducción de cuota", color: "#8A5A2B" },
+  reduccion_plazo: { label: "Reducción de plazo", color: "#3D6B54" },
+  cuota_mensual: { label: "Cuota mensual", color: "#3A6EA5" },
+  // Alias para registros guardados antes de este cambio (esquema anterior)
+  prepago: { label: "Reducción de cuota", color: "#8A5A2B" },
+  cuota: { label: "Cuota mensual", color: "#3A6EA5" },
 };
 const MEDIOS = {
   yape: "Yape",
@@ -363,6 +370,9 @@ function aplicarRol() {
   const esHermano = rol && rol.tipo === "hermano";
   document.getElementById("tab-btn-banco").hidden = esHermano;
   document.getElementById("edit-config-btn").hidden = esHermano;
+  document.getElementById("header-title").textContent = esHermano
+    ? `Cuenta de ${rol.nombre}`
+    : "Cuenta entre 3 hermanos";
   if (esHermano) {
     document.getElementById("tab-yapes").hidden = false;
     document.getElementById("tab-banco").hidden = true;
@@ -620,8 +630,9 @@ function renderAll() {
     yapes.filter((y) => y.hermano === idx && y.estado === "verificado").reduce((s, y) => s + y.monto, 0)
   );
   const desglosePorHermano = config.hermanos.map((_, idx) => ({
-    prepago: yapes.filter((y) => y.hermano === idx && y.estado === "verificado" && y.motivo === "prepago").reduce((s, y) => s + y.monto, 0),
-    cuota: yapes.filter((y) => y.hermano === idx && y.estado === "verificado" && y.motivo === "cuota").reduce((s, y) => s + y.monto, 0),
+    cuota: yapes.filter((y) => y.hermano === idx && y.estado === "verificado" && (y.motivo === "reduccion_cuota" || y.motivo === "prepago")).reduce((s, y) => s + y.monto, 0),
+    plazo: yapes.filter((y) => y.hermano === idx && y.estado === "verificado" && y.motivo === "reduccion_plazo").reduce((s, y) => s + y.monto, 0),
+    mensual: yapes.filter((y) => y.hermano === idx && y.estado === "verificado" && (y.motivo === "cuota_mensual" || y.motivo === "cuota")).reduce((s, y) => s + y.monto, 0),
   }));
   const maxTotal = Math.max(1, ...totalesPorHermano);
   const grid = document.getElementById("hermanos-grid");
@@ -639,7 +650,7 @@ function renderAll() {
     monto.textContent = formatSoles(totalesPorHermano[idx]);
     const desglose = document.createElement("div");
     desglose.className = "hermano-desglose";
-    desglose.textContent = `Prepago ${formatSoles(desglosePorHermano[idx].prepago)} · Cuota ${formatSoles(desglosePorHermano[idx].cuota)}`;
+    desglose.textContent = `Cuota ${formatSoles(desglosePorHermano[idx].cuota)} · Plazo ${formatSoles(desglosePorHermano[idx].plazo)} · Mensual ${formatSoles(desglosePorHermano[idx].mensual)}`;
     const track = document.createElement("div");
     track.className = "bar-track";
     track.innerHTML = `<div class="bar-fill" style="width:${(totalesPorHermano[idx] / maxTotal) * 100}%"></div>`;
@@ -665,12 +676,14 @@ function renderAll() {
   // totals yapes
   const verificado = yapes.filter((y) => y.estado === "verificado").reduce((s, y) => s + y.monto, 0);
   const pendiente = yapes.filter((y) => y.estado === "pendiente").reduce((s, y) => s + y.monto, 0);
-  const totalPrepago = yapes.filter((y) => y.motivo === "prepago").reduce((s, y) => s + y.monto, 0);
-  const totalCuotaMotivo = yapes.filter((y) => y.motivo === "cuota").reduce((s, y) => s + y.monto, 0);
+  const totalReducCuota = yapes.filter((y) => y.motivo === "reduccion_cuota" || y.motivo === "prepago").reduce((s, y) => s + y.monto, 0);
+  const totalReducPlazo = yapes.filter((y) => y.motivo === "reduccion_plazo").reduce((s, y) => s + y.monto, 0);
+  const totalMensual = yapes.filter((y) => y.motivo === "cuota_mensual" || y.motivo === "cuota").reduce((s, y) => s + y.monto, 0);
   document.getElementById("total-verificado").textContent = formatSoles(verificado);
   document.getElementById("total-pendiente").textContent = formatSoles(pendiente);
-  document.getElementById("total-motivo-prepago").textContent = formatSoles(totalPrepago);
-  document.getElementById("total-motivo-cuota").textContent = formatSoles(totalCuotaMotivo);
+  document.getElementById("total-motivo-cuota").textContent = formatSoles(totalReducCuota);
+  document.getElementById("total-motivo-plazo").textContent = formatSoles(totalReducPlazo);
+  document.getElementById("total-motivo-mensual").textContent = formatSoles(totalMensual);
 
   // yapes ledger
   const yLedger = document.getElementById("yapes-ledger");
