@@ -274,7 +274,11 @@
           </div>
           <div class="form-row">
             <input id="banco-capital" type="number" placeholder="Monto a capital (opcional)" />
-            <input id="banco-nota" placeholder="Nota (opcional)" style="grid-column:span 2" />
+            <input id="banco-nota" placeholder="Nota (opcional)" />
+            <div class="field-col">
+              <label class="field-label">Constancia (foto, opcional)</label>
+              <input id="banco-imagen" type="file" accept="image/*,application/pdf" />
+            </div>
           </div>
           <button class="add-btn" id="banco-add-btn">Agregar pago</button>
         </div>
@@ -316,8 +320,12 @@ import {
 const USUARIOS = [
   { nombre: "Cristian Reyna", clave: "73427943", tipo: "hermano", hermanoIdx: 0 },
   { nombre: "Marlon Reyna", clave: "45967179", tipo: "hermano", hermanoIdx: 1 },
-  { nombre: "Administrador", clave: "47105956", tipo: "encargado" },
+  { nombre: "Gustavo Reyna", clave: "47105956", tipo: "encargado" },
 ];
+// Nombres de hermanos, siempre en el mismo orden que sus hermanoIdx.
+const NOMBRES_HERMANOS = USUARIOS.filter((u) => u.tipo === "hermano")
+  .sort((a, b) => a.hermanoIdx - b.hermanoIdx)
+  .map((u) => u.nombre);
 
 // Firebase se inicializa DESPUÉS de iniciar sesión (dentro de initApp),
 // para que el login nunca dependa de que Firebase esté bien configurado.
@@ -372,7 +380,7 @@ function aplicarRol() {
   document.getElementById("edit-config-btn").hidden = esHermano;
   document.getElementById("header-title").textContent = esHermano
     ? `Cuenta: ${rol.nombre}`
-    : "Cuenta entre 3 hermanos";
+    : `Administrador: ${rol.nombre}`;
   if (esHermano) {
     document.getElementById("tab-yapes").hidden = false;
     document.getElementById("tab-banco").hidden = true;
@@ -544,8 +552,7 @@ document.getElementById("edit-config-btn").addEventListener("click", async () =>
   if (!editingConfig) {
     const nuevoInicial = Number(document.getElementById("cuota-inicial-edit").value) || config.cuotaInicial;
     const nuevoActual = Number(document.getElementById("cuota-actual-edit").value) || config.cuotaActual;
-    const nombres = Array.from(document.querySelectorAll(".hermano-name-input")).map((i) => i.value);
-    config = { ...config, cuotaInicial: nuevoInicial, cuotaActual: nuevoActual, hermanos: nombres.length ? nombres : config.hermanos };
+    config = { ...config, cuotaInicial: nuevoInicial, cuotaActual: nuevoActual };
     try { await setDoc(doc(db, "config", "main"), config); }
     catch (e) { showError("No se pudo guardar la configuración."); }
   }
@@ -566,7 +573,7 @@ document.getElementById("yape-add-btn").addEventListener("click", async () => {
   btn.textContent = file ? "Subiendo constancia…" : "Guardando…";
 
   try {
-    const { url, nombre } = await subirConstancia(file, config.hermanos[hermanoIdx] || "hermano", fechaPago);
+    const { url, nombre } = await subirConstancia(file, NOMBRES_HERMANOS[hermanoIdx] || "hermano", fechaPago);
     const nuevo = {
       hermano: hermanoIdx,
       medioPago: document.getElementById("yape-medio").value,
@@ -596,19 +603,36 @@ document.getElementById("banco-add-btn").addEventListener("click", async () => {
   const monto = Number(document.getElementById("banco-monto").value);
   if (!monto || monto <= 0) return;
   const capitalVal = document.getElementById("banco-capital").value;
-  const nuevo = {
-    fecha: document.getElementById("banco-fecha").value,
-    monto,
-    tipo: document.getElementById("banco-tipo").value,
-    montoCapital: capitalVal ? Number(capitalVal) : null,
-    nota: document.getElementById("banco-nota").value.trim(),
-  };
+  const fecha = document.getElementById("banco-fecha").value;
+  const fileInput = document.getElementById("banco-imagen");
+  const file = fileInput.files[0] || null;
+  const btn = document.getElementById("banco-add-btn");
+
+  btn.disabled = true;
+  btn.textContent = file ? "Subiendo constancia…" : "Guardando…";
+
   try {
+    const { url, nombre } = await subirConstancia(file, "banco", fecha);
+    const nuevo = {
+      fecha,
+      monto,
+      tipo: document.getElementById("banco-tipo").value,
+      montoCapital: capitalVal ? Number(capitalVal) : null,
+      nota: document.getElementById("banco-nota").value.trim(),
+      imagenUrl: url,
+      imagenNombre: nombre,
+    };
     await addDoc(collection(db, "pagosBanco"), nuevo);
     document.getElementById("banco-monto").value = "";
     document.getElementById("banco-capital").value = "";
     document.getElementById("banco-nota").value = "";
-  } catch (e) { showError("No se pudo guardar el pago."); }
+    fileInput.value = "";
+  } catch (e) {
+    showError("No se pudo guardar el pago (revisa Storage/Firestore).");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Agregar pago";
+  }
 });
 
 // ---------- RENDER ----------
@@ -626,10 +650,10 @@ function renderAll() {
   document.getElementById("edit-config-btn").textContent = editingConfig ? "Guardar" : "Editar";
 
   // hermanos grid + select
-  const totalesPorHermano = config.hermanos.map((_, idx) =>
+  const totalesPorHermano = NOMBRES_HERMANOS.map((_, idx) =>
     yapes.filter((y) => y.hermano === idx && y.estado === "verificado").reduce((s, y) => s + y.monto, 0)
   );
-  const desglosePorHermano = config.hermanos.map((_, idx) => ({
+  const desglosePorHermano = NOMBRES_HERMANOS.map((_, idx) => ({
     cuota: yapes.filter((y) => y.hermano === idx && y.estado === "verificado" && (y.motivo === "reduccion_cuota" || y.motivo === "prepago")).reduce((s, y) => s + y.monto, 0),
     plazo: yapes.filter((y) => y.hermano === idx && y.estado === "verificado" && y.motivo === "reduccion_plazo").reduce((s, y) => s + y.monto, 0),
     mensual: yapes.filter((y) => y.hermano === idx && y.estado === "verificado" && (y.motivo === "cuota_mensual" || y.motivo === "cuota")).reduce((s, y) => s + y.monto, 0),
@@ -637,14 +661,12 @@ function renderAll() {
   const maxTotal = Math.max(1, ...totalesPorHermano);
   const grid = document.getElementById("hermanos-grid");
   grid.innerHTML = "";
-  const indicesAMostrar = rol.tipo === "hermano" ? [rol.hermanoIdx] : config.hermanos.map((_, i) => i);
+  const indicesAMostrar = rol.tipo === "hermano" ? [rol.hermanoIdx] : NOMBRES_HERMANOS.map((_, i) => i);
   indicesAMostrar.forEach((idx) => {
-    const nombre = (rol.tipo === "hermano") ? rol.nombre : config.hermanos[idx];
+    const nombre = NOMBRES_HERMANOS[idx];
     const card = document.createElement("div");
     card.className = "hermano-card";
-    card.innerHTML = editingConfig
-      ? `<input class="hermano-name-input" value="${escapeHtml(nombre)}" />`
-      : `<div class="hermano-nombre">${escapeHtml(nombre)}</div>`;
+    card.innerHTML = `<div class="hermano-nombre">${escapeHtml(nombre)}</div>`;
     const monto = document.createElement("div");
     monto.className = "hermano-monto";
     monto.textContent = formatSoles(totalesPorHermano[idx]);
@@ -669,7 +691,7 @@ function renderAll() {
     }
     const selEl = document.getElementById("yape-hermano");
     const prevVal = selEl.value;
-    selEl.innerHTML = config.hermanos.map((n, idx) => `<option value="${idx}">${escapeHtml(n)}</option>`).join("");
+    selEl.innerHTML = NOMBRES_HERMANOS.map((n, idx) => `<option value="${idx}">${escapeHtml(n)}</option>`).join("");
     if (prevVal) selEl.value = prevVal;
   }
 
@@ -701,7 +723,7 @@ function renderAll() {
       row.innerHTML = `
         <div class="ledger-date">${formatFecha(y.fechaPago)}</div>
         <div class="ledger-mid">
-          <div class="ledger-hermano">${escapeHtml(rol.tipo === "hermano" ? rol.nombre : (config.hermanos[y.hermano] || "—"))}</div>
+          <div class="ledger-hermano">${escapeHtml(rol.tipo === "hermano" ? rol.nombre : (NOMBRES_HERMANOS[y.hermano] || "—"))}</div>
           <span class="motivo-tag" style="color:${m.color};border-color:${m.color}">${m.label}</span>
           ${medio ? `<span class="medio-tag">${medio}</span>` : ""}
           ${y.nota ? `<span class="nota">${escapeHtml(y.nota)}</span>` : ""}
@@ -742,6 +764,7 @@ function renderAll() {
         <div class="ledger-mid">
           <span class="tipo-tag" style="color:${t.color};border-color:${t.color}">${t.label}</span>
           ${p.nota ? `<span class="nota">${escapeHtml(p.nota)}</span>` : ""}
+          ${p.imagenUrl ? `<a class="constancia-link" href="${p.imagenUrl}" target="_blank" rel="noopener">🖼 Ver constancia</a>` : ""}
         </div>
         <div class="ledger-monto">${formatSoles(p.monto)}</div>
         <button class="del-btn" data-id="${p.id}" data-action="delete-banco">✕</button>
