@@ -90,16 +90,18 @@
   .add-btn:disabled{opacity:.6;cursor:default;}
   .ledger{display:flex;flex-direction:column;border:1px solid var(--border);border-radius:8px;overflow:hidden;}
   .empty{padding:18px 14px;font-size:13px;color:var(--muted);text-align:center;font-style:italic;}
-  .ledger-row{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid #EFEADB;
-    background:#FDFCF8;flex-wrap:wrap;}
-  .ledger-date{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);width:62px;flex-shrink:0;}
-  .ledger-mid{display:flex;align-items:center;gap:8px;flex:1;flex-wrap:wrap;min-width:0;}
+  .ledger-row{display:flex;flex-direction:column;gap:6px;padding:10px 14px;border-bottom:1px solid #EFEADB;
+    background:#FDFCF8;}
+  .ledger-row-top{display:flex;justify-content:space-between;align-items:center;gap:10px;}
+  .ledger-date{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);}
+  .ledger-mid{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0;}
   .ledger-hermano{font-size:13px;font-weight:600;}
-  .tipo-tag{font-family:'IBM Plex Mono',monospace;font-size:10px;border:1px solid;border-radius:10px;padding:1px 7px;}
+  .tipo-tag{font-family:'IBM Plex Mono',monospace;font-size:10px;border:1px solid;border-radius:10px;padding:1px 7px;white-space:nowrap;}
   .nota{font-size:12px;color:var(--muted);font-style:italic;}
   .ledger-monto{font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:600;flex-shrink:0;}
+  .ledger-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
   .estado-btn{display:flex;align-items:center;gap:4px;font-family:'IBM Plex Mono',monospace;font-size:10px;
-    border:1px solid;border-radius:10px;padding:3px 8px;cursor:pointer;background:transparent;flex-shrink:0;}
+    border:1px solid;border-radius:10px;padding:3px 8px;cursor:pointer;background:transparent;flex-shrink:0;white-space:nowrap;}
   .estado-btn.verificado{color:var(--sage);border-color:var(--sage);}
   .estado-btn.pendiente{color:var(--brass2);border-color:var(--brass2);}
   .del-btn{background:transparent;border:none;color:#C08A6A;cursor:pointer;padding:4px;flex-shrink:0;font-size:14px;}
@@ -397,14 +399,10 @@ let editingConfig = false;
 let rol = null; // { tipo: "hermano", hermanoIdx: 0 } | { tipo: "encargado" }
 
 function cargarRol() {
-  try {
-    const raw = localStorage.getItem("libreta-rol");
-    return raw ? JSON.parse(raw) : null;
-  } catch (e) { return null; }
+  return null; // ya no se recuerda entre visitas: siempre se pide login
 }
 function guardarRol(nuevoRol) {
-  rol = nuevoRol;
-  try { localStorage.setItem("libreta-rol", JSON.stringify(nuevoRol)); } catch (e) {}
+  rol = nuevoRol; // solo en memoria, durante esta sesión de la pestaña
 }
 function aplicarRol() {
   const esHermano = rol && rol.tipo === "hermano";
@@ -495,16 +493,7 @@ function tryLogin() {
   }
 }
 
-// Arranque: si ya había un usuario guardado en este dispositivo, saltar el login
-(function bootstrap() {
-  const rolGuardado = cargarRol();
-  if (rolGuardado) {
-    rol = rolGuardado;
-    document.getElementById("login").hidden = true;
-    document.getElementById("loading").hidden = false;
-    initApp();
-  }
-})();
+// (Ya no hay arranque automático: cada carga de la página muestra el login.)
 
 // ---------- INIT ----------
 async function initApp() {
@@ -547,13 +536,17 @@ async function initApp() {
   });
 
   // Si es un hermano, la consulta a Firestore trae SOLO sus propios registros
-  // (filtrado en el servidor, no solo escondido en la pantalla).
+  // (filtrado en el servidor, no solo escondido en la pantalla). El orden se
+  // hace en el navegador para no depender de crear un índice en Firebase.
   const yapesQuery = rol.tipo === "hermano"
-    ? query(collection(db, "yapes"), where("hermano", "==", rol.hermanoIdx), orderBy("fechaPago", "desc"))
+    ? query(collection(db, "yapes"), where("hermano", "==", rol.hermanoIdx))
     : query(collection(db, "yapes"), orderBy("fechaPago", "desc"));
 
   onSnapshot(yapesQuery, (snap) => {
     yapes = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    if (rol.tipo === "hermano") {
+      yapes.sort((a, b) => (a.fechaPago < b.fechaPago ? 1 : a.fechaPago > b.fechaPago ? -1 : 0));
+    }
     renderAll();
   }, (err) => { showError("Error al leer pagos: " + err.message); console.error(err); });
 
@@ -572,7 +565,6 @@ async function initApp() {
 }
 
 document.getElementById("cambiar-rol-btn").addEventListener("click", () => {
-  try { localStorage.removeItem("libreta-rol"); } catch (e) {}
   location.reload();
 });
 
@@ -849,7 +841,10 @@ function renderAll() {
       const row = document.createElement("div");
       row.className = "ledger-row";
       row.innerHTML = `
-        <div class="ledger-date">${formatFecha(y.fechaPago)}</div>
+        <div class="ledger-row-top">
+          <div class="ledger-date">${formatFecha(y.fechaPago)}</div>
+          <div class="ledger-monto">${formatSoles(y.monto)}</div>
+        </div>
         <div class="ledger-mid">
           <div class="ledger-hermano">${escapeHtml(rol.tipo === "hermano" ? nombreActual() : (NOMBRES_HERMANOS[y.hermano] || "—"))}</div>
           <span class="motivo-tag" style="color:${m.color};border-color:${m.color}">${m.label}</span>
@@ -858,13 +853,14 @@ function renderAll() {
           ${y.imagenUrl ? `<a class="constancia-link" href="${y.imagenUrl}" target="_blank" rel="noopener">🖼 Ver constancia</a>` : ""}
           ${mostrarRegistro ? `<span class="ledger-registro">Registrado el ${formatFecha(fechaReg)}</span>` : ""}
         </div>
-        <div class="ledger-monto">${formatSoles(y.monto)}</div>
-        ${rol.tipo === "hermano"
-          ? `<span class="estado-btn ${y.estado}" style="cursor:default;">${y.estado === "verificado" ? "✓ Verificado" : "⏳ Pendiente"}</span>`
-          : `<button class="estado-btn ${y.estado}" data-id="${y.id}" data-action="toggle">${y.estado === "verificado" ? "✓ Verificado" : "⏳ Pendiente"}</button>`
-        }
-        <button class="del-btn" data-id="${y.id}" data-action="edit-yape" title="Editar">✎</button>
-        ${rol.tipo !== "hermano" ? `<button class="del-btn" data-id="${y.id}" data-action="delete-yape" title="Eliminar">✕</button>` : ""}
+        <div class="ledger-actions">
+          ${rol.tipo === "hermano"
+            ? `<span class="estado-btn ${y.estado}" style="cursor:default;">${y.estado === "verificado" ? "✓ Verificado" : "⏳ Pendiente"}</span>`
+            : `<button class="estado-btn ${y.estado}" data-id="${y.id}" data-action="toggle">${y.estado === "verificado" ? "✓ Verificado" : "⏳ Pendiente"}</button>`
+          }
+          <button class="del-btn" data-id="${y.id}" data-action="edit-yape" title="Editar">✎</button>
+          ${rol.tipo !== "hermano" ? `<button class="del-btn" data-id="${y.id}" data-action="delete-yape" title="Eliminar">✕</button>` : ""}
+        </div>
       `;
       yLedger.appendChild(row);
     });
@@ -890,15 +886,19 @@ function renderAll() {
       const row = document.createElement("div");
       row.className = "ledger-row";
       row.innerHTML = `
-        <div class="ledger-date">${formatFecha(p.fecha)}</div>
+        <div class="ledger-row-top">
+          <div class="ledger-date">${formatFecha(p.fecha)}</div>
+          <div class="ledger-monto">${formatSoles(p.monto)}</div>
+        </div>
         <div class="ledger-mid">
           <span class="tipo-tag" style="color:${t.color};border-color:${t.color}">${t.label}</span>
           ${p.nota ? `<span class="nota">${escapeHtml(p.nota)}</span>` : ""}
           ${p.imagenUrl ? `<a class="constancia-link" href="${p.imagenUrl}" target="_blank" rel="noopener">🖼 Ver constancia</a>` : ""}
         </div>
-        <div class="ledger-monto">${formatSoles(p.monto)}</div>
-        <button class="del-btn" data-id="${p.id}" data-action="edit-banco" title="Editar">✎</button>
-        <button class="del-btn" data-id="${p.id}" data-action="delete-banco" title="Eliminar">✕</button>
+        <div class="ledger-actions">
+          <button class="del-btn" data-id="${p.id}" data-action="edit-banco" title="Editar">✎</button>
+          <button class="del-btn" data-id="${p.id}" data-action="delete-banco" title="Eliminar">✕</button>
+        </div>
       `;
       bLedger.appendChild(row);
     });
