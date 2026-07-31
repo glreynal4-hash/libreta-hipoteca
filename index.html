@@ -105,6 +105,18 @@
   .estado-btn.verificado{color:var(--sage);border-color:var(--sage);}
   .estado-btn.pendiente{color:var(--brass2);border-color:var(--brass2);}
   .del-btn{background:transparent;border:none;color:#C08A6A;cursor:pointer;padding:4px;flex-shrink:0;font-size:14px;}
+  .filtros-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;}
+  .filtros-row select, .filtros-row input{font-size:12px;padding:6px 8px;border-radius:5px;border:1px solid #D3CBB8;
+    background:#fff;color:var(--ink);}
+  .filtros-row input[type="text"]{width:100px;}
+  .paginacion{display:flex;justify-content:center;align-items:center;gap:12px;padding:12px 0 4px;
+    font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted);}
+  .paginacion button{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:6px 12px;
+    cursor:pointer;font-family:inherit;font-size:12px;color:var(--ink);}
+  .paginacion button:disabled{opacity:.4;cursor:default;}
+  .ledger-numero{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);}
+  .view-btn{background:transparent;border:1px solid var(--brass);color:var(--brass);border-radius:6px;
+    cursor:pointer;padding:4px 7px;flex-shrink:0;font-size:13px;text-decoration:none;display:inline-flex;}
   .footer{margin-top:16px;font-size:11px;color:#A69A88;text-align:center;}
   .gate{min-height:100vh;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;}
   .gate input{width:min(220px,80vw);text-align:center;font-family:'IBM Plex Mono',monospace;font-size:16px;letter-spacing:.1em;}
@@ -128,6 +140,8 @@
     .hermanos-grid{grid-template-columns:1fr;}
     .header{flex-wrap:wrap;gap:8px;}
     .ledger-row{gap:6px;}
+    .filtros-row select, .filtros-row input{flex:1 1 47%;}
+    .filtros-row input[type="text"]{width:auto;}
   }
 </style>
 </head>
@@ -141,6 +155,9 @@
   <div id="login-step2" hidden style="display:flex;flex-direction:column;gap:10px;width:min(240px,86vw);align-items:center;">
     <div id="login-nombre-elegido" style="font-weight:600;"></div>
     <input id="login-clave" type="password" placeholder="Tu clave" inputmode="numeric" />
+    <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#8A7C68;">
+      <input type="checkbox" id="login-recordar" /> Mantener sesión iniciada en este dispositivo
+    </label>
     <button id="login-btn">Entrar</button>
     <button class="cambiar-rol" id="login-volver-btn">‹ Elegir otro usuario</button>
     <div id="login-error" style="color:#9C4221;font-size:13px;display:none;">Clave incorrecta</div>
@@ -189,7 +206,7 @@
 
       <!-- YAPES TAB -->
       <div id="tab-yapes">
-        <div class="section-label">👥 APORTES VERIFICADOS POR HERMANO</div>
+        <div class="section-label">👥 APORTES VERIFICADOS POR PERSONA</div>
         <div class="hermanos-grid" id="hermanos-grid"></div>
 
         <div class="totals-row">
@@ -262,7 +279,29 @@
         </div>
 
         <div class="section-label">📅 HISTORIAL DE PAGOS</div>
+        <div class="filtros-row">
+          <select id="filtro-yape-estado">
+            <option value="todos">Todos los estados</option>
+            <option value="verificado">Verificado</option>
+            <option value="pendiente">Pendiente</option>
+          </select>
+          <select id="filtro-yape-hermano"></select>
+          <input id="filtro-yape-desde" type="date" title="Desde" />
+          <input id="filtro-yape-hasta" type="date" title="Hasta" />
+          <input id="filtro-yape-numero" type="text" placeholder="N° registro" inputmode="numeric" />
+          <select id="filtro-yape-orden">
+            <option value="fecha_desc">Fecha: más reciente</option>
+            <option value="fecha_asc">Fecha: más antigua</option>
+            <option value="numero_desc">N° registro: mayor a menor</option>
+            <option value="numero_asc">N° registro: menor a mayor</option>
+          </select>
+        </div>
         <div class="ledger" id="yapes-ledger"></div>
+        <div class="paginacion">
+          <button id="yapes-pag-prev">‹ Anterior</button>
+          <span id="yapes-pag-info"></span>
+          <button id="yapes-pag-next">Siguiente ›</button>
+        </div>
       </div>
 
       <!-- BANCO TAB -->
@@ -289,6 +328,7 @@
             <select id="banco-tipo">
               <option value="cuota">Reducción de cuota</option>
               <option value="plazo">Reducción de plazo</option>
+              <option value="cuota_mensual">Pago de Cuota Mensual</option>
             </select>
             <input id="banco-monto" type="number" placeholder="Monto pagado (S/)" />
           </div>
@@ -305,7 +345,23 @@
         </div>
 
         <div class="section-label">📅 HISTORIAL DE PAGOS AL BANCO</div>
+        <div class="filtros-row">
+          <input id="filtro-banco-desde" type="date" title="Desde" />
+          <input id="filtro-banco-hasta" type="date" title="Hasta" />
+          <input id="filtro-banco-numero" type="text" placeholder="N° registro" inputmode="numeric" />
+          <select id="filtro-banco-orden">
+            <option value="fecha_desc">Fecha: más reciente</option>
+            <option value="fecha_asc">Fecha: más antigua</option>
+            <option value="numero_desc">N° registro: mayor a menor</option>
+            <option value="numero_asc">N° registro: menor a mayor</option>
+          </select>
+        </div>
         <div class="ledger" id="banco-ledger"></div>
+        <div class="paginacion">
+          <button id="banco-pag-prev">‹ Anterior</button>
+          <span id="banco-pag-info"></span>
+          <button id="banco-pag-next">Siguiente ›</button>
+        </div>
       </div>
 
       <div class="footer">Datos privados de acceso individual con usuario y clave.</div>
@@ -330,7 +386,7 @@ const firebaseConfig = {
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import {
   getFirestore, collection, doc, addDoc, updateDoc, deleteDoc,
-  onSnapshot, setDoc, getDoc, query, orderBy, where
+  onSnapshot, setDoc, getDoc, query, orderBy, where, runTransaction
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import {
   getStorage, ref, uploadBytes, getDownloadURL
@@ -391,18 +447,46 @@ async function subirConstancia(file, hermanoNombre, fechaPago) {
   return { url, nombre: nombreArchivo };
 }
 
+// Número de registro consecutivo (00001, 00002...), único aunque varios
+// usuarios registren pagos al mismo tiempo (contador atómico por transacción).
+async function siguienteNumero(nombreContador) {
+  const ref = doc(db, "contadores", nombreContador);
+  const nuevo = await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    const actual = snap.exists() ? (snap.data().valor || 0) : 0;
+    const n = actual + 1;
+    tx.set(ref, { valor: n });
+    return n;
+  });
+  return nuevo;
+}
+function formatNumero(n) {
+  return n ? String(n).padStart(5, "0") : "—";
+}
+
 const DEFAULT_CONFIG = { hermanos: ["Cristian Reyna", "Marlon Reyna"], cuotaInicial: 1131, cuotaActual: 1080 };
 let config = DEFAULT_CONFIG;
 let yapes = [];
 let pagosBanco = [];
 let editingConfig = false;
 let rol = null; // { tipo: "hermano", hermanoIdx: 0 } | { tipo: "encargado" }
+const PAGE_SIZE = 10;
+let yapesFiltro = { estado: "todos", hermano: "todos", desde: "", hasta: "", numero: "", orden: "fecha_desc" };
+let yapesPagina = 1;
+let bancoFiltro = { desde: "", hasta: "", numero: "", orden: "fecha_desc" };
+let bancoPagina = 1;
 
 function cargarRol() {
-  return null; // ya no se recuerda entre visitas: siempre se pide login
+  try {
+    const raw = localStorage.getItem("libreta-rol");
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) { return null; }
 }
-function guardarRol(nuevoRol) {
-  rol = nuevoRol; // solo en memoria, durante esta sesión de la pestaña
+function guardarRol(nuevoRol, persistir) {
+  rol = nuevoRol;
+  if (persistir) {
+    try { localStorage.setItem("libreta-rol", JSON.stringify(nuevoRol)); } catch (e) {}
+  }
 }
 function aplicarRol() {
   const esHermano = rol && rol.tipo === "hermano";
@@ -484,7 +568,8 @@ function tryLogin() {
     const nuevoRol = usuarioSeleccionado.tipo === "hermano"
       ? { tipo: "hermano", hermanoIdx: usuarioSeleccionado.hermanoIdx }
       : { tipo: "encargado" };
-    guardarRol(nuevoRol);
+    const recordar = document.getElementById("login-recordar").checked;
+    guardarRol(nuevoRol, recordar);
     document.getElementById("login").hidden = true;
     document.getElementById("loading").hidden = false;
     initApp();
@@ -493,7 +578,16 @@ function tryLogin() {
   }
 }
 
-// (Ya no hay arranque automático: cada carga de la página muestra el login.)
+// Arranque: si el usuario marcó "mantener sesión iniciada" la última vez, saltar el login
+(function bootstrap() {
+  const rolGuardado = cargarRol();
+  if (rolGuardado) {
+    rol = rolGuardado;
+    document.getElementById("login").hidden = true;
+    document.getElementById("loading").hidden = false;
+    initApp();
+  }
+})();
 
 // ---------- INIT ----------
 async function initApp() {
@@ -565,6 +659,7 @@ async function initApp() {
 }
 
 document.getElementById("cambiar-rol-btn").addEventListener("click", () => {
+  try { localStorage.removeItem("libreta-rol"); } catch (e) {}
   location.reload();
 });
 
@@ -658,7 +753,8 @@ document.getElementById("yape-add-btn").addEventListener("click", async () => {
       yapeEditId = null;
       document.getElementById("yape-cancelar-edicion").hidden = true;
     } else {
-      await addDoc(collection(db, "yapes"), { ...datos, fechaRegistro: new Date().toISOString(), estado: "pendiente" });
+      const numero = await siguienteNumero("yapes");
+      await addDoc(collection(db, "yapes"), { ...datos, numero, fechaRegistro: new Date().toISOString(), estado: "pendiente" });
     }
     document.getElementById("yape-monto").value = "";
     document.getElementById("yape-nota").value = "";
@@ -736,7 +832,8 @@ document.getElementById("banco-add-btn").addEventListener("click", async () => {
       bancoEditId = null;
       document.getElementById("banco-cancelar-edicion").hidden = true;
     } else {
-      await addDoc(collection(db, "pagosBanco"), datos);
+      const numero = await siguienteNumero("banco");
+      await addDoc(collection(db, "pagosBanco"), { ...datos, numero });
     }
     document.getElementById("banco-monto").value = "";
     document.getElementById("banco-capital").value = "";
@@ -750,7 +847,55 @@ document.getElementById("banco-add-btn").addEventListener("click", async () => {
   }
 });
 
-// ---------- RENDER ----------
+// ---------- FILTROS Y PAGINACIÓN ----------
+["filtro-yape-estado", "filtro-yape-hermano", "filtro-yape-desde", "filtro-yape-hasta", "filtro-yape-orden"].forEach((id) => {
+  document.getElementById(id).addEventListener("change", () => {
+    yapesFiltro.estado = document.getElementById("filtro-yape-estado").value;
+    yapesFiltro.hermano = document.getElementById("filtro-yape-hermano").value;
+    yapesFiltro.desde = document.getElementById("filtro-yape-desde").value;
+    yapesFiltro.hasta = document.getElementById("filtro-yape-hasta").value;
+    yapesFiltro.orden = document.getElementById("filtro-yape-orden").value;
+    yapesPagina = 1;
+    renderAll();
+  });
+});
+document.getElementById("filtro-yape-numero").addEventListener("input", () => {
+  yapesFiltro.numero = document.getElementById("filtro-yape-numero").value.trim();
+  yapesPagina = 1;
+  renderAll();
+});
+document.getElementById("yapes-pag-prev").addEventListener("click", () => { yapesPagina = Math.max(1, yapesPagina - 1); renderAll(); });
+document.getElementById("yapes-pag-next").addEventListener("click", () => { yapesPagina += 1; renderAll(); });
+
+["filtro-banco-desde", "filtro-banco-hasta", "filtro-banco-orden"].forEach((id) => {
+  document.getElementById(id).addEventListener("change", () => {
+    bancoFiltro.desde = document.getElementById("filtro-banco-desde").value;
+    bancoFiltro.hasta = document.getElementById("filtro-banco-hasta").value;
+    bancoFiltro.orden = document.getElementById("filtro-banco-orden").value;
+    bancoPagina = 1;
+    renderAll();
+  });
+});
+document.getElementById("filtro-banco-numero").addEventListener("input", () => {
+  bancoFiltro.numero = document.getElementById("filtro-banco-numero").value.trim();
+  bancoPagina = 1;
+  renderAll();
+});
+document.getElementById("banco-pag-prev").addEventListener("click", () => { bancoPagina = Math.max(1, bancoPagina - 1); renderAll(); });
+document.getElementById("banco-pag-next").addEventListener("click", () => { bancoPagina += 1; renderAll(); });
+
+function ordenarPor(lista, orden) {
+  const arr = [...lista];
+  arr.sort((a, b) => {
+    if (orden === "numero_asc") return (a.numero || 0) - (b.numero || 0);
+    if (orden === "numero_desc") return (b.numero || 0) - (a.numero || 0);
+    const fa = a.fechaPago || a.fecha || "";
+    const fb = b.fechaPago || b.fecha || "";
+    if (orden === "fecha_asc") return fa < fb ? -1 : fa > fb ? 1 : 0;
+    return fa < fb ? 1 : fa > fb ? -1 : 0; // fecha_desc (por defecto)
+  });
+  return arr;
+}
 function renderAll() {
   // cuota card
   document.getElementById("cuota-inicial-view").hidden = editingConfig;
@@ -827,13 +972,46 @@ function renderAll() {
   document.getElementById("total-motivo-plazo").textContent = formatSoles(totalReducPlazo);
   document.getElementById("total-motivo-mensual").textContent = formatSoles(totalMensual);
 
-  // yapes ledger
+  // filtro por hermano (poblado dinámicamente, oculto si el rol es hermano)
+  const selFiltroHermano = document.getElementById("filtro-yape-hermano");
+  const colFiltroHermano = selFiltroHermano;
+  if (rol.tipo === "hermano") {
+    colFiltroHermano.style.display = "none";
+  } else {
+    colFiltroHermano.style.display = "";
+    const prevF = selFiltroHermano.value || "todos";
+    selFiltroHermano.innerHTML = `<option value="todos">Todas las personas</option>` +
+      NOMBRES_HERMANOS.map((n, idx) => `<option value="${idx}">${escapeHtml(n)}</option>`).join("");
+    selFiltroHermano.value = prevF;
+  }
+
+  // yapes ledger: aplicar filtros
+  let yapesFiltrados = yapes.filter((y) => {
+    if (yapesFiltro.estado !== "todos" && y.estado !== yapesFiltro.estado) return false;
+    if (rol.tipo !== "hermano" && yapesFiltro.hermano !== "todos" && String(y.hermano) !== yapesFiltro.hermano) return false;
+    if (yapesFiltro.desde && y.fechaPago < yapesFiltro.desde) return false;
+    if (yapesFiltro.hasta && y.fechaPago > yapesFiltro.hasta) return false;
+    if (yapesFiltro.numero && !String(y.numero || "").includes(yapesFiltro.numero.replace(/^0+/, ""))) return false;
+    return true;
+  });
+  yapesFiltrados = ordenarPor(yapesFiltrados, yapesFiltro.orden);
+
+  const totalPagYapes = Math.max(1, Math.ceil(yapesFiltrados.length / PAGE_SIZE));
+  if (yapesPagina > totalPagYapes) yapesPagina = totalPagYapes;
+  const yapesPagina_lista = yapesFiltrados.slice((yapesPagina - 1) * PAGE_SIZE, yapesPagina * PAGE_SIZE);
+
+  document.getElementById("yapes-pag-info").textContent = yapesFiltrados.length
+    ? `Página ${yapesPagina} de ${totalPagYapes} (${yapesFiltrados.length} registros)`
+    : "Sin registros";
+  document.getElementById("yapes-pag-prev").disabled = yapesPagina <= 1;
+  document.getElementById("yapes-pag-next").disabled = yapesPagina >= totalPagYapes;
+
   const yLedger = document.getElementById("yapes-ledger");
   yLedger.innerHTML = "";
-  if (yapes.length === 0) {
-    yLedger.innerHTML = `<div class="empty">Aún no hay pagos registrados.</div>`;
+  if (yapesPagina_lista.length === 0) {
+    yLedger.innerHTML = `<div class="empty">No hay pagos que coincidan con el filtro.</div>`;
   } else {
-    yapes.forEach((y) => {
+    yapesPagina_lista.forEach((y) => {
       const m = MOTIVOS[y.motivo] || MOTIVOS.prepago;
       const medio = MEDIOS[y.medioPago] || null;
       const fechaReg = y.fechaRegistro ? y.fechaRegistro.slice(0, 10) : null;
@@ -842,7 +1020,7 @@ function renderAll() {
       row.className = "ledger-row";
       row.innerHTML = `
         <div class="ledger-row-top">
-          <div class="ledger-date">${formatFecha(y.fechaPago)}</div>
+          <div class="ledger-date">N° ${formatNumero(y.numero)} · ${formatFecha(y.fechaPago)}</div>
           <div class="ledger-monto">${formatSoles(y.monto)}</div>
         </div>
         <div class="ledger-mid">
@@ -850,7 +1028,6 @@ function renderAll() {
           <span class="motivo-tag" style="color:${m.color};border-color:${m.color}">${m.label}</span>
           ${medio ? `<span class="medio-tag">${medio}</span>` : ""}
           ${y.nota ? `<span class="nota">${escapeHtml(y.nota)}</span>` : ""}
-          ${y.imagenUrl ? `<a class="constancia-link" href="${y.imagenUrl}" target="_blank" rel="noopener">🖼 Ver constancia</a>` : ""}
           ${mostrarRegistro ? `<span class="ledger-registro">Registrado el ${formatFecha(fechaReg)}</span>` : ""}
         </div>
         <div class="ledger-actions">
@@ -858,6 +1035,7 @@ function renderAll() {
             ? `<span class="estado-btn ${y.estado}" style="cursor:default;">${y.estado === "verificado" ? "✓ Verificado" : "⏳ Pendiente"}</span>`
             : `<button class="estado-btn ${y.estado}" data-id="${y.id}" data-action="toggle">${y.estado === "verificado" ? "✓ Verificado" : "⏳ Pendiente"}</button>`
           }
+          ${y.imagenUrl ? `<a class="view-btn" href="${y.imagenUrl}" target="_blank" rel="noopener" title="Ver constancia">🖼</a>` : ""}
           <button class="del-btn" data-id="${y.id}" data-action="edit-yape" title="Editar">✎</button>
           ${rol.tipo !== "hermano" ? `<button class="del-btn" data-id="${y.id}" data-action="delete-yape" title="Eliminar">✕</button>` : ""}
         </div>
@@ -874,28 +1052,46 @@ function renderAll() {
   document.getElementById("total-capital").textContent = formatSoles(totalCapital);
   document.getElementById("total-interes").textContent = formatSoles(totalInteres);
 
-  // banco ledger
-  const TIPOS = { cuota: { label: "Cuota", color: "#8A5A2B" }, plazo: { label: "Plazo", color: "#3D6B54" } };
+  // banco ledger: aplicar filtros
+  const TIPOS = { cuota: { label: "Cuota", color: "#8A5A2B" }, plazo: { label: "Plazo", color: "#3D6B54" }, cuota_mensual: { label: "Cuota mensual", color: "#3A6EA5" } };
+  let bancoFiltrado = pagosBanco.filter((p) => {
+    if (bancoFiltro.desde && p.fecha < bancoFiltro.desde) return false;
+    if (bancoFiltro.hasta && p.fecha > bancoFiltro.hasta) return false;
+    if (bancoFiltro.numero && !String(p.numero || "").includes(bancoFiltro.numero.replace(/^0+/, ""))) return false;
+    return true;
+  });
+  bancoFiltrado = ordenarPor(bancoFiltrado, bancoFiltro.orden);
+
+  const totalPagBanco = Math.max(1, Math.ceil(bancoFiltrado.length / PAGE_SIZE));
+  if (bancoPagina > totalPagBanco) bancoPagina = totalPagBanco;
+  const bancoPagina_lista = bancoFiltrado.slice((bancoPagina - 1) * PAGE_SIZE, bancoPagina * PAGE_SIZE);
+
+  document.getElementById("banco-pag-info").textContent = bancoFiltrado.length
+    ? `Página ${bancoPagina} de ${totalPagBanco} (${bancoFiltrado.length} registros)`
+    : "Sin registros";
+  document.getElementById("banco-pag-prev").disabled = bancoPagina <= 1;
+  document.getElementById("banco-pag-next").disabled = bancoPagina >= totalPagBanco;
+
   const bLedger = document.getElementById("banco-ledger");
   bLedger.innerHTML = "";
-  if (pagosBanco.length === 0) {
-    bLedger.innerHTML = `<div class="empty">Aún no hay pagos registrados.</div>`;
+  if (bancoPagina_lista.length === 0) {
+    bLedger.innerHTML = `<div class="empty">No hay pagos que coincidan con el filtro.</div>`;
   } else {
-    pagosBanco.forEach((p) => {
+    bancoPagina_lista.forEach((p) => {
       const t = TIPOS[p.tipo] || TIPOS.cuota;
       const row = document.createElement("div");
       row.className = "ledger-row";
       row.innerHTML = `
         <div class="ledger-row-top">
-          <div class="ledger-date">${formatFecha(p.fecha)}</div>
+          <div class="ledger-date">N° ${formatNumero(p.numero)} · ${formatFecha(p.fecha)}</div>
           <div class="ledger-monto">${formatSoles(p.monto)}</div>
         </div>
         <div class="ledger-mid">
           <span class="tipo-tag" style="color:${t.color};border-color:${t.color}">${t.label}</span>
           ${p.nota ? `<span class="nota">${escapeHtml(p.nota)}</span>` : ""}
-          ${p.imagenUrl ? `<a class="constancia-link" href="${p.imagenUrl}" target="_blank" rel="noopener">🖼 Ver constancia</a>` : ""}
         </div>
         <div class="ledger-actions">
+          ${p.imagenUrl ? `<a class="view-btn" href="${p.imagenUrl}" target="_blank" rel="noopener" title="Ver constancia">🖼</a>` : ""}
           <button class="del-btn" data-id="${p.id}" data-action="edit-banco" title="Editar">✎</button>
           <button class="del-btn" data-id="${p.id}" data-action="delete-banco" title="Eliminar">✕</button>
         </div>
@@ -925,8 +1121,10 @@ document.addEventListener("click", async (e) => {
       const y = yapes.find((x) => x.id === id);
       await updateDoc(doc(db, "yapes", id), { estado: y.estado === "verificado" ? "pendiente" : "verificado" });
     } else if (action === "delete-yape") {
+      if (!confirm("¿Seguro que quieres eliminar este registro? Esta acción no se puede deshacer.")) return;
       await deleteDoc(doc(db, "yapes", id));
     } else if (action === "delete-banco") {
+      if (!confirm("¿Seguro que quieres eliminar este registro? Esta acción no se puede deshacer.")) return;
       await deleteDoc(doc(db, "pagosBanco", id));
     }
   } catch (err) { showError("No se pudo completar la acción."); }
