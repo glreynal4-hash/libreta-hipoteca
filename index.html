@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Libreta Hipoteca — 3 hermanos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Slab:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#FAF8F3; --bg:#EEF1F4; --card:#F3EFE4; --border:#E2DDD0;
+    --ink:#16233D; --ink2:#22314F; --brass:#8A5A2B; --brass2:#A9702B;
+    --sage:#3D6B54; --muted:#8A7C68; --danger:#9C4221;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);font-family:'IBM Plex Sans',sans-serif;color:var(--ink);}
+  .wrap{min-height:100vh;padding:24px 12px;display:flex;justify-content:center;}
+  .passbook{position:relative;width:100%;max-width:720px;background:var(--paper);border-radius:10px;
+    box-shadow:0 1px 3px rgba(22,35,61,.08),0 8px 24px rgba(22,35,61,.1);border:1px solid var(--border);
+    display:flex;overflow:hidden;}
+  .perforation{width:22px;background:#E4DECE;display:flex;flex-direction:column;align-items:center;
+    justify-content:space-evenly;padding:16px 0;border-right:1px dashed #C9C0A9;flex-shrink:0;}
+  .hole{width:6px;height:6px;border-radius:50%;background:var(--bg);box-shadow:inset 0 1px 2px rgba(22,35,61,.25);}
+  .content{flex:1;padding:24px 24px 20px;min-width:0;}
+  .header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:18px;}
+  .eyebrow{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;color:var(--brass2);margin-bottom:4px;}
+  h1{font-family:'Roboto Slab',serif;font-size:22px;font-weight:700;margin:0;color:var(--ink);}
+  .error{display:none;align-items:center;gap:8px;background:#FCEEE9;border:1px solid #E8B4A0;color:var(--danger);
+    font-size:13px;padding:8px 12px;border-radius:6px;margin-bottom:14px;}
+  .cuota-card{display:flex;align-items:center;gap:14px;background:var(--ink);border-radius:8px;padding:16px 18px;
+    margin-bottom:18px;flex-wrap:wrap;}
+  .cuota-col{display:flex;flex-direction:column;gap:2px;}
+  .cuota-label{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;color:#9AAAC7;text-transform:uppercase;}
+  .cuota-value{font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:600;color:#F7F5F0;}
+  .cuota-value-muted{font-family:'IBM Plex Mono',monospace;font-size:16px;color:#7C8CA8;text-decoration:line-through;}
+  .cuota-input{font-family:'IBM Plex Mono',monospace;font-size:16px;background:var(--ink2);border:1px solid #3A4A6B;
+    border-radius:4px;color:#F7F5F0;padding:4px 6px;width:90px;}
+  .cuota-reduccion{display:flex;align-items:center;gap:5px;font-family:'IBM Plex Mono',monospace;font-size:15px;
+    font-weight:600;color:#7FBF9E;}
+  .arrow{color:#5A6C8C;font-size:18px;}
+  .edit-btn{margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;background:transparent;
+    border:1px solid #4A5A7B;color:#C7D1E3;border-radius:5px;padding:6px 10px;cursor:pointer;}
+  .tabs{display:flex;gap:6px;margin-bottom:18px;border-bottom:1px solid var(--border);}
+  .tab-btn{display:flex;align-items:center;gap:6px;font-family:'IBM Plex Mono',monospace;font-size:12px;
+    background:transparent;border:none;border-bottom:2px solid transparent;color:var(--muted);padding:8px 4px;
+    cursor:pointer;}
+  .tab-btn.active{color:var(--brass);border-bottom-color:var(--brass);font-weight:600;}
+  .section-label{display:flex;align-items:center;gap:6px;font-family:'IBM Plex Mono',monospace;font-size:11px;
+    letter-spacing:.07em;color:var(--brass);margin:20px 0 10px;}
+  .hermanos-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;}
+  .hermano-card{background:var(--card);border:1px solid var(--border);border-radius:7px;padding:10px 12px;}
+  .hermano-nombre{font-size:13px;font-weight:600;margin-bottom:4px;}
+  .hermano-name-input{font-size:13px;font-weight:600;margin-bottom:4px;border:1px solid #C9C0A9;border-radius:4px;
+    padding:2px 4px;width:100%;background:#fff;}
+  .hermano-monto{font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600;color:var(--brass);margin-bottom:6px;}
+  .bar-track{height:5px;background:var(--border);border-radius:3px;overflow:hidden;}
+  .bar-fill{height:100%;background:var(--brass);border-radius:3px;}
+  .totals-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-top:12px;}
+  .total-box{background:var(--card);border-radius:7px;padding:10px 12px;text-align:center;}
+  .total-label{font-family:'IBM Plex Mono',monospace;font-size:10px;color:#7A6E5C;margin-bottom:4px;}
+  .total-value{font-family:'IBM Plex Mono',monospace;font-size:16px;font-weight:600;}
+  .total-value.sage{color:var(--sage);} .total-value.muted{color:var(--brass2);}
+  .form{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:14px;display:flex;
+    flex-direction:column;gap:8px;}
+  .form-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
+  .field-col{display:flex;flex-direction:column;gap:3px;min-width:0;}
+  .field-label{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);}
+  input[type="file"]{padding:6px 8px;background:#fff;}
+  .constancia-link{display:inline-flex;align-items:center;gap:4px;font-family:'IBM Plex Mono',monospace;font-size:10px;
+    color:var(--brass);border:1px solid var(--brass);border-radius:10px;padding:3px 8px;text-decoration:none;flex-shrink:0;}
+  .ledger-registro{font-size:10px;color:#B4A98F;flex-basis:100%;}
+  .motivo-tag{font-family:'IBM Plex Mono',monospace;font-size:10px;border:1px solid;border-radius:10px;padding:1px 7px;}
+  .hermano-desglose{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);margin-bottom:4px;}
+  .uploading{opacity:.7;pointer-events:none;}
+  input,select{font-size:13px;padding:8px 10px;border-radius:5px;border:1px solid #D3CBB8;background:#fff;
+    color:var(--ink);min-width:0;font-family:inherit;}
+  input:focus,select:focus,button:focus-visible{outline:2px solid var(--brass);outline-offset:1px;}
+  .add-btn{display:flex;align-items:center;justify-content:center;gap:6px;font-size:13px;font-weight:600;
+    background:var(--brass);color:var(--paper);border:none;border-radius:6px;padding:10px 14px;cursor:pointer;margin-top:2px;}
+  .add-btn:disabled{opacity:.6;cursor:default;}
+  .ledger{display:flex;flex-direction:column;border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+  .empty{padding:18px 14px;font-size:13px;color:var(--muted);text-align:center;font-style:italic;}
+  .ledger-row{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid #EFEADB;
+    background:#FDFCF8;flex-wrap:wrap;}
+  .ledger-date{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);width:62px;flex-shrink:0;}
+  .ledger-mid{display:flex;align-items:center;gap:8px;flex:1;flex-wrap:wrap;min-width:0;}
+  .ledger-hermano{font-size:13px;font-weight:600;}
+  .tipo-tag{font-family:'IBM Plex Mono',monospace;font-size:10px;border:1px solid;border-radius:10px;padding:1px 7px;}
+  .nota{font-size:12px;color:var(--muted);font-style:italic;}
+  .ledger-monto{font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:600;flex-shrink:0;}
+  .estado-btn{display:flex;align-items:center;gap:4px;font-family:'IBM Plex Mono',monospace;font-size:10px;
+    border:1px solid;border-radius:10px;padding:3px 8px;cursor:pointer;background:transparent;flex-shrink:0;}
+  .estado-btn.verificado{color:var(--sage);border-color:var(--sage);}
+  .estado-btn.pendiente{color:var(--brass2);border-color:var(--brass2);}
+  .del-btn{background:transparent;border:none;color:#C08A6A;cursor:pointer;padding:4px;flex-shrink:0;font-size:14px;}
+  .footer{margin-top:16px;font-size:11px;color:#A69A88;text-align:center;}
+  .gate{min-height:100vh;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;}
+  .gate input{width:220px;text-align:center;font-family:'IBM Plex Mono',monospace;font-size:16px;letter-spacing:.1em;}
+  .gate button{background:var(--brass);color:var(--paper);border:none;border-radius:6px;padding:10px 18px;
+    cursor:pointer;font-weight:600;}
+  .loading{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'IBM Plex Mono',monospace;
+    color:#5B4A3A;}
+  [hidden]{display:none !important;}
+</style>
+</head>
+<body>
+
+<div id="gate" class="gate">
+  <div style="font-family:'Roboto Slab',serif;font-size:20px;">🔐 Libreta Hipoteca</div>
+  <input id="gate-input" type="password" placeholder="Código de acceso" />
+  <button id="gate-btn">Entrar</button>
+  <div id="gate-error" style="color:#9C4221;font-size:13px;display:none;">Código incorrecto</div>
+</div>
+
+<div id="loading" class="loading" hidden>Abriendo la libreta…</div>
+
+<div id="app" class="wrap" hidden>
+  <div class="passbook">
+    <div class="perforation" aria-hidden="true" id="perforation"></div>
+    <div class="content">
+      <div class="header">
+        <div>
+          <div class="eyebrow">LIBRETA · CRÉDITO HIPOTECARIO COMPARTIDO</div>
+          <h1>Cuenta entre 3 hermanos</h1>
+        </div>
+      </div>
+
+      <div class="error" id="error-box"><span id="error-text"></span></div>
+
+      <div class="cuota-card">
+        <div class="cuota-col">
+          <div class="cuota-label">Cuota inicial</div>
+          <div id="cuota-inicial-view" class="cuota-value-muted"></div>
+          <input id="cuota-inicial-edit" type="number" class="cuota-input" hidden />
+        </div>
+        <div class="arrow">→</div>
+        <div class="cuota-col">
+          <div class="cuota-label">Cuota actual</div>
+          <div id="cuota-actual-view" class="cuota-value"></div>
+          <input id="cuota-actual-edit" type="number" class="cuota-input" hidden />
+        </div>
+        <div class="cuota-col">
+          <div class="cuota-label">Reducción lograda</div>
+          <div class="cuota-reduccion" id="cuota-reduccion"></div>
+        </div>
+        <button class="edit-btn" id="edit-config-btn">Editar</button>
+      </div>
+
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="yapes">📱 Aportes por Yape</button>
+        <button class="tab-btn" data-tab="banco">🏦 Pagos al banco</button>
+      </div>
+
+      <!-- YAPES TAB -->
+      <div id="tab-yapes">
+        <div class="section-label">👥 APORTES VERIFICADOS POR HERMANO</div>
+        <div class="hermanos-grid" id="hermanos-grid"></div>
+
+        <div class="totals-row">
+          <div class="total-box">
+            <div class="total-label">Verificado</div>
+            <div class="total-value sage" id="total-verificado"></div>
+          </div>
+          <div class="total-box">
+            <div class="total-label">Pendiente por verificar</div>
+            <div class="total-value muted" id="total-pendiente"></div>
+          </div>
+          <div class="total-box">
+            <div class="total-label">Total prepagos</div>
+            <div class="total-value" id="total-motivo-prepago"></div>
+          </div>
+          <div class="total-box">
+            <div class="total-label">Total cuota mensual</div>
+            <div class="total-value" id="total-motivo-cuota"></div>
+          </div>
+        </div>
+
+        <div class="section-label">➕ REGISTRAR YAPE ENVIADO</div>
+        <div class="form">
+          <div class="form-row">
+            <select id="yape-hermano"></select>
+            <select id="yape-motivo">
+              <option value="prepago">Importe prepago</option>
+              <option value="cuota">Importe cuota mensual</option>
+            </select>
+            <input id="yape-monto" type="number" placeholder="Monto yapeado (S/)" />
+          </div>
+          <div class="form-row">
+            <div class="field-col">
+              <label class="field-label">Fecha en que pagaste</label>
+              <input id="yape-fecha-pago" type="date" />
+            </div>
+            <div class="field-col" style="grid-column:span 2">
+              <label class="field-label">Constancia (foto/captura del Yape)</label>
+              <input id="yape-imagen" type="file" accept="image/*,application/pdf" />
+            </div>
+          </div>
+          <div class="form-row">
+            <input id="yape-nota" placeholder="Nota (opcional)" style="grid-column:1/-1" />
+          </div>
+          <button class="add-btn" id="yape-add-btn">Registrar Yape</button>
+        </div>
+
+        <div class="section-label">📅 HISTORIAL DE YAPES</div>
+        <div class="ledger" id="yapes-ledger"></div>
+      </div>
+
+      <!-- BANCO TAB -->
+      <div id="tab-banco" hidden>
+        <div class="totals-row">
+          <div class="total-box">
+            <div class="total-label">Total pagado al banco</div>
+            <div class="total-value" id="total-banco"></div>
+          </div>
+          <div class="total-box">
+            <div class="total-label">A capital (aprox.)</div>
+            <div class="total-value sage" id="total-capital"></div>
+          </div>
+          <div class="total-box">
+            <div class="total-label">Interés/seguro</div>
+            <div class="total-value muted" id="total-interes"></div>
+          </div>
+        </div>
+
+        <div class="section-label">➕ REGISTRAR PAGO AL BANCO</div>
+        <div class="form">
+          <div class="form-row">
+            <input id="banco-fecha" type="date" />
+            <select id="banco-tipo">
+              <option value="cuota">Reducción de cuota</option>
+              <option value="plazo">Reducción de plazo</option>
+            </select>
+            <input id="banco-monto" type="number" placeholder="Monto pagado (S/)" />
+          </div>
+          <div class="form-row">
+            <input id="banco-capital" type="number" placeholder="Monto a capital (opcional)" />
+            <input id="banco-nota" placeholder="Nota (opcional)" style="grid-column:span 2" />
+          </div>
+          <button class="add-btn" id="banco-add-btn">Agregar pago</button>
+        </div>
+
+        <div class="section-label">📅 HISTORIAL DE PAGOS AL BANCO</div>
+        <div class="ledger" id="banco-ledger"></div>
+      </div>
+
+      <div class="footer">Datos compartidos entre quienes tengan el enlace y el código de acceso.</div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+// ============================================================
+// 1) CONFIGURA AQUÍ tus credenciales de Firebase (ver README)
+// ============================================================
+const firebaseConfig = {
+  apiKey: "AIzaSyDEpC9Eak_21XHxZk4M1zmqDDFkp8lXkOU",
+  authDomain: "hipoteca-hermanos.firebaseapp.com",
+  projectId: "hipoteca-hermanos",
+  storageBucket: "hipoteca-hermanos.firebasestorage.app",
+  messagingSenderId: "618401100507",
+  appId: "1:618401100507:web:350c97fb88f3b155ded2fe",
+};
+
+// Código de acceso simple (cámbialo por el que quieras). No es seguridad
+// real, solo evita que alguien que no tiene el código entre por curiosidad.
+const CODIGO_ACCESO = "hermanos2026";
+
+// ============================================================
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import {
+  getFirestore, collection, doc, addDoc, updateDoc, deleteDoc,
+  onSnapshot, setDoc, getDoc, query, orderBy
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import {
+  getStorage, ref, uploadBytes, getDownloadURL
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+
+// Firebase se inicializa DESPUÉS de pasar el código de acceso (dentro de initApp),
+// para que el botón "Entrar" nunca dependa de que Firebase esté bien configurado.
+let db, storage;
+
+const MOTIVOS = {
+  prepago: { label: "Prepago", color: "#8A5A2B" },
+  cuota: { label: "Cuota mensual", color: "#3D6B54" },
+};
+
+// Sube la imagen a Storage con un nombre automático y devuelve su URL pública
+async function subirConstancia(file, hermanoNombre, fechaPago) {
+  if (!file) return { url: null, nombre: null };
+  const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+  const slug = hermanoNombre.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  const nombreArchivo = `Constancia_Yape_${fechaPago}_${slug}_${Date.now()}.${ext}`;
+  const storageRef = ref(storage, `constancias/${nombreArchivo}`);
+  await uploadBytes(storageRef, file);
+  const url = await getDownloadURL(storageRef);
+  return { url, nombre: nombreArchivo };
+}
+
+const DEFAULT_CONFIG = { hermanos: ["Hermano 1", "Hermano 2", "Hermano 3"], cuotaInicial: 1131, cuotaActual: 1080 };
+let config = DEFAULT_CONFIG;
+let yapes = [];
+let pagosBanco = [];
+let editingConfig = false;
+
+function formatSoles(n) {
+  const v = Number(n) || 0;
+  return "S/ " + v.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function formatFecha(iso) {
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-");
+  const meses = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+  return `${d} ${meses[parseInt(m,10)-1]} ${y}`;
+}
+function showError(msg) {
+  const box = document.getElementById("error-box");
+  document.getElementById("error-text").textContent = msg;
+  box.style.display = "flex";
+  setTimeout(() => (box.style.display = "none"), 4000);
+}
+
+// ---------- ACCESS GATE ----------
+document.getElementById("gate-btn").addEventListener("click", tryEnter);
+document.getElementById("gate-input").addEventListener("keydown", (e) => { if (e.key === "Enter") tryEnter(); });
+function tryEnter() {
+  const val = document.getElementById("gate-input").value;
+  if (val === CODIGO_ACCESO) {
+    document.getElementById("gate").hidden = true;
+    document.getElementById("loading").hidden = false;
+    initApp();
+  } else {
+    document.getElementById("gate-error").style.display = "block";
+  }
+}
+
+// ---------- INIT ----------
+async function initApp() {
+  try {
+    const app = initializeApp(firebaseConfig);
+    db = getFirestore(app);
+    storage = getStorage(app);
+  } catch (e) {
+    const loadingEl = document.getElementById("loading");
+    loadingEl.textContent = "⚠️ No se pudo iniciar Firebase. Revisa que copiaste bien el firebaseConfig en el archivo.";
+    return;
+  }
+
+  // holes decor
+  const perf = document.getElementById("perforation");
+  for (let i = 0; i < 26; i++) {
+    const h = document.createElement("div");
+    h.className = "hole";
+    perf.appendChild(h);
+  }
+
+  document.getElementById("yape-fecha-pago").value = new Date().toISOString().slice(0, 10);
+  document.getElementById("banco-fecha").value = new Date().toISOString().slice(0, 10);
+
+  try {
+    const cfgRef = doc(db, "config", "main");
+    const cfgSnap = await getDoc(cfgRef);
+    if (!cfgSnap.exists()) {
+      await setDoc(cfgRef, DEFAULT_CONFIG);
+      config = DEFAULT_CONFIG;
+    } else {
+      config = { ...DEFAULT_CONFIG, ...cfgSnap.data() };
+    }
+  } catch (e) {
+    showError("No se pudo conectar a la base de datos. Revisa la configuración de Firebase.");
+  }
+
+  onSnapshot(doc(db, "config", "main"), (snap) => {
+    if (snap.exists()) { config = { ...DEFAULT_CONFIG, ...snap.data() }; renderAll(); }
+  });
+
+  onSnapshot(query(collection(db, "yapes"), orderBy("fechaPago", "desc")), (snap) => {
+    yapes = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    renderAll();
+  }, () => showError("No se pudo leer 'yapes'. Revisa las reglas de Firestore."));
+
+  onSnapshot(query(collection(db, "pagosBanco"), orderBy("fecha", "desc")), (snap) => {
+    pagosBanco = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    renderAll();
+  }, () => showError("No se pudo leer 'pagosBanco'. Revisa las reglas de Firestore."));
+
+  document.getElementById("loading").hidden = true;
+  document.getElementById("app").hidden = false;
+  renderAll();
+}
+
+// ---------- TABS ----------
+document.querySelectorAll(".tab-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById("tab-yapes").hidden = btn.dataset.tab !== "yapes";
+    document.getElementById("tab-banco").hidden = btn.dataset.tab !== "banco";
+  });
+});
+
+// ---------- CONFIG EDIT ----------
+document.getElementById("edit-config-btn").addEventListener("click", async () => {
+  editingConfig = !editingConfig;
+  if (!editingConfig) {
+    const nuevoInicial = Number(document.getElementById("cuota-inicial-edit").value) || config.cuotaInicial;
+    const nuevoActual = Number(document.getElementById("cuota-actual-edit").value) || config.cuotaActual;
+    const nombres = Array.from(document.querySelectorAll(".hermano-name-input")).map((i) => i.value);
+    config = { ...config, cuotaInicial: nuevoInicial, cuotaActual: nuevoActual, hermanos: nombres.length ? nombres : config.hermanos };
+    try { await setDoc(doc(db, "config", "main"), config); }
+    catch (e) { showError("No se pudo guardar la configuración."); }
+  }
+  renderAll();
+});
+
+// ---------- ADD YAPE ----------
+document.getElementById("yape-add-btn").addEventListener("click", async () => {
+  const monto = Number(document.getElementById("yape-monto").value);
+  if (!monto || monto <= 0) return;
+  const hermanoIdx = Number(document.getElementById("yape-hermano").value);
+  const fechaPago = document.getElementById("yape-fecha-pago").value;
+  const fileInput = document.getElementById("yape-imagen");
+  const file = fileInput.files[0] || null;
+  const btn = document.getElementById("yape-add-btn");
+
+  btn.disabled = true;
+  btn.textContent = file ? "Subiendo constancia…" : "Guardando…";
+
+  try {
+    const { url, nombre } = await subirConstancia(file, config.hermanos[hermanoIdx] || "hermano", fechaPago);
+    const nuevo = {
+      hermano: hermanoIdx,
+      motivo: document.getElementById("yape-motivo").value,
+      fechaPago,
+      fechaRegistro: new Date().toISOString(),
+      monto,
+      nota: document.getElementById("yape-nota").value.trim(),
+      estado: "pendiente",
+      imagenUrl: url,
+      imagenNombre: nombre,
+    };
+    await addDoc(collection(db, "yapes"), nuevo);
+    document.getElementById("yape-monto").value = "";
+    document.getElementById("yape-nota").value = "";
+    fileInput.value = "";
+  } catch (e) {
+    showError("No se pudo guardar el Yape (revisa Storage/Firestore).");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Registrar Yape";
+  }
+});
+
+// ---------- ADD PAGO BANCO ----------
+document.getElementById("banco-add-btn").addEventListener("click", async () => {
+  const monto = Number(document.getElementById("banco-monto").value);
+  if (!monto || monto <= 0) return;
+  const capitalVal = document.getElementById("banco-capital").value;
+  const nuevo = {
+    fecha: document.getElementById("banco-fecha").value,
+    monto,
+    tipo: document.getElementById("banco-tipo").value,
+    montoCapital: capitalVal ? Number(capitalVal) : null,
+    nota: document.getElementById("banco-nota").value.trim(),
+  };
+  try {
+    await addDoc(collection(db, "pagosBanco"), nuevo);
+    document.getElementById("banco-monto").value = "";
+    document.getElementById("banco-capital").value = "";
+    document.getElementById("banco-nota").value = "";
+  } catch (e) { showError("No se pudo guardar el pago."); }
+});
+
+// ---------- RENDER ----------
+function renderAll() {
+  // cuota card
+  document.getElementById("cuota-inicial-view").hidden = editingConfig;
+  document.getElementById("cuota-actual-view").hidden = editingConfig;
+  document.getElementById("cuota-inicial-edit").hidden = !editingConfig;
+  document.getElementById("cuota-actual-edit").hidden = !editingConfig;
+  document.getElementById("cuota-inicial-view").textContent = formatSoles(config.cuotaInicial);
+  document.getElementById("cuota-actual-view").textContent = formatSoles(config.cuotaActual);
+  document.getElementById("cuota-inicial-edit").value = config.cuotaInicial;
+  document.getElementById("cuota-actual-edit").value = config.cuotaActual;
+  document.getElementById("cuota-reduccion").innerHTML = `↓ ${formatSoles(config.cuotaInicial - config.cuotaActual)}/mes`;
+  document.getElementById("edit-config-btn").textContent = editingConfig ? "Guardar" : "Editar";
+
+  // hermanos grid + select
+  const totalesPorHermano = config.hermanos.map((_, idx) =>
+    yapes.filter((y) => y.hermano === idx && y.estado === "verificado").reduce((s, y) => s + y.monto, 0)
+  );
+  const desglosePorHermano = config.hermanos.map((_, idx) => ({
+    prepago: yapes.filter((y) => y.hermano === idx && y.estado === "verificado" && y.motivo === "prepago").reduce((s, y) => s + y.monto, 0),
+    cuota: yapes.filter((y) => y.hermano === idx && y.estado === "verificado" && y.motivo === "cuota").reduce((s, y) => s + y.monto, 0),
+  }));
+  const maxTotal = Math.max(1, ...totalesPorHermano);
+  const grid = document.getElementById("hermanos-grid");
+  grid.innerHTML = "";
+  config.hermanos.forEach((nombre, idx) => {
+    const card = document.createElement("div");
+    card.className = "hermano-card";
+    card.innerHTML = editingConfig
+      ? `<input class="hermano-name-input" value="${escapeHtml(nombre)}" />`
+      : `<div class="hermano-nombre">${escapeHtml(nombre)}</div>`;
+    const monto = document.createElement("div");
+    monto.className = "hermano-monto";
+    monto.textContent = formatSoles(totalesPorHermano[idx]);
+    const desglose = document.createElement("div");
+    desglose.className = "hermano-desglose";
+    desglose.textContent = `Prepago ${formatSoles(desglosePorHermano[idx].prepago)} · Cuota ${formatSoles(desglosePorHermano[idx].cuota)}`;
+    const track = document.createElement("div");
+    track.className = "bar-track";
+    track.innerHTML = `<div class="bar-fill" style="width:${(totalesPorHermano[idx] / maxTotal) * 100}%"></div>`;
+    card.appendChild(monto);
+    card.appendChild(desglose);
+    card.appendChild(track);
+    grid.appendChild(card);
+  });
+
+  const sel = document.getElementById("yape-hermano");
+  const prevVal = sel.value;
+  sel.innerHTML = config.hermanos.map((n, idx) => `<option value="${idx}">${escapeHtml(n)}</option>`).join("");
+  if (prevVal) sel.value = prevVal;
+
+  // totals yapes
+  const verificado = yapes.filter((y) => y.estado === "verificado").reduce((s, y) => s + y.monto, 0);
+  const pendiente = yapes.filter((y) => y.estado === "pendiente").reduce((s, y) => s + y.monto, 0);
+  const totalPrepago = yapes.filter((y) => y.motivo === "prepago").reduce((s, y) => s + y.monto, 0);
+  const totalCuotaMotivo = yapes.filter((y) => y.motivo === "cuota").reduce((s, y) => s + y.monto, 0);
+  document.getElementById("total-verificado").textContent = formatSoles(verificado);
+  document.getElementById("total-pendiente").textContent = formatSoles(pendiente);
+  document.getElementById("total-motivo-prepago").textContent = formatSoles(totalPrepago);
+  document.getElementById("total-motivo-cuota").textContent = formatSoles(totalCuotaMotivo);
+
+  // yapes ledger
+  const yLedger = document.getElementById("yapes-ledger");
+  yLedger.innerHTML = "";
+  if (yapes.length === 0) {
+    yLedger.innerHTML = `<div class="empty">Aún no hay yapes registrados.</div>`;
+  } else {
+    yapes.forEach((y) => {
+      const m = MOTIVOS[y.motivo] || MOTIVOS.prepago;
+      const fechaReg = y.fechaRegistro ? y.fechaRegistro.slice(0, 10) : null;
+      const mostrarRegistro = fechaReg && fechaReg !== y.fechaPago;
+      const row = document.createElement("div");
+      row.className = "ledger-row";
+      row.innerHTML = `
+        <div class="ledger-date">${formatFecha(y.fechaPago)}</div>
+        <div class="ledger-mid">
+          <div class="ledger-hermano">${escapeHtml(config.hermanos[y.hermano] || "—")}</div>
+          <span class="motivo-tag" style="color:${m.color};border-color:${m.color}">${m.label}</span>
+          ${y.nota ? `<span class="nota">${escapeHtml(y.nota)}</span>` : ""}
+          ${y.imagenUrl ? `<a class="constancia-link" href="${y.imagenUrl}" target="_blank" rel="noopener">🖼 Ver constancia</a>` : ""}
+          ${mostrarRegistro ? `<span class="ledger-registro">Registrado el ${formatFecha(fechaReg)}</span>` : ""}
+        </div>
+        <div class="ledger-monto">${formatSoles(y.monto)}</div>
+        <button class="estado-btn ${y.estado}" data-id="${y.id}" data-action="toggle">
+          ${y.estado === "verificado" ? "✓ Verificado" : "⏳ Pendiente"}
+        </button>
+        <button class="del-btn" data-id="${y.id}" data-action="delete-yape">✕</button>
+      `;
+      yLedger.appendChild(row);
+    });
+  }
+
+  // totals banco
+  const totalBanco = pagosBanco.reduce((s, p) => s + p.monto, 0);
+  const totalCapital = pagosBanco.reduce((s, p) => s + (p.montoCapital || p.monto), 0);
+  const totalInteres = pagosBanco.reduce((s, p) => s + (p.montoCapital ? p.monto - p.montoCapital : 0), 0);
+  document.getElementById("total-banco").textContent = formatSoles(totalBanco);
+  document.getElementById("total-capital").textContent = formatSoles(totalCapital);
+  document.getElementById("total-interes").textContent = formatSoles(totalInteres);
+
+  // banco ledger
+  const TIPOS = { cuota: { label: "Cuota", color: "#8A5A2B" }, plazo: { label: "Plazo", color: "#3D6B54" } };
+  const bLedger = document.getElementById("banco-ledger");
+  bLedger.innerHTML = "";
+  if (pagosBanco.length === 0) {
+    bLedger.innerHTML = `<div class="empty">Aún no hay pagos registrados.</div>`;
+  } else {
+    pagosBanco.forEach((p) => {
+      const t = TIPOS[p.tipo] || TIPOS.cuota;
+      const row = document.createElement("div");
+      row.className = "ledger-row";
+      row.innerHTML = `
+        <div class="ledger-date">${formatFecha(p.fecha)}</div>
+        <div class="ledger-mid">
+          <span class="tipo-tag" style="color:${t.color};border-color:${t.color}">${t.label}</span>
+          ${p.nota ? `<span class="nota">${escapeHtml(p.nota)}</span>` : ""}
+        </div>
+        <div class="ledger-monto">${formatSoles(p.monto)}</div>
+        <button class="del-btn" data-id="${p.id}" data-action="delete-banco">✕</button>
+      `;
+      bLedger.appendChild(row);
+    });
+  }
+}
+
+// event delegation for ledger buttons
+document.addEventListener("click", async (e) => {
+  const btn = e.target.closest("button[data-action]");
+  if (!btn) return;
+  const id = btn.dataset.id;
+  const action = btn.dataset.action;
+  try {
+    if (action === "toggle") {
+      const y = yapes.find((x) => x.id === id);
+      await updateDoc(doc(db, "yapes", id), { estado: y.estado === "verificado" ? "pendiente" : "verificado" });
+    } else if (action === "delete-yape") {
+      await deleteDoc(doc(db, "yapes", id));
+    } else if (action === "delete-banco") {
+      await deleteDoc(doc(db, "pagosBanco", id));
+    }
+  } catch (err) { showError("No se pudo completar la acción."); }
+});
+
+function escapeHtml(str) {
+  const d = document.createElement("div");
+  d.textContent = str ?? "";
+  return d.innerHTML;
+}
+</script>
+</body>
+</html>
