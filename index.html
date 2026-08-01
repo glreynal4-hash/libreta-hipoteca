@@ -23,16 +23,16 @@
   .hole{width:6px;height:6px;border-radius:50%;background:var(--bg);box-shadow:inset 0 1px 2px rgba(22,35,61,.25);}
   .content{flex:1;padding:24px 24px 20px;min-width:0;}
   .header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:18px;}
-  .eyebrow{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;color:var(--brass2);margin-bottom:4px;}
+  .eyebrow{font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.08em;color:var(--brass2);margin-bottom:4px;}
   h1{font-family:'Roboto Slab',serif;font-size:22px;font-weight:700;margin:0;color:var(--ink);}
   .error{display:none;align-items:center;gap:8px;background:#FCEEE9;border:1px solid #E8B4A0;color:var(--danger);
     font-size:13px;padding:8px 12px;border-radius:6px;margin-bottom:14px;}
   .cuota-card{display:flex;align-items:center;gap:14px;background:var(--ink);border-radius:8px;padding:16px 18px;
     margin-bottom:18px;flex-wrap:wrap;}
   .cuota-col{display:flex;flex-direction:column;gap:2px;}
-  .cuota-label{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;color:#9AAAC7;text-transform:uppercase;}
-  .cuota-value{font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:600;color:#F7F5F0;}
-  .cuota-value-muted{font-family:'IBM Plex Mono',monospace;font-size:16px;color:#7C8CA8;text-decoration:line-through;}
+  .cuota-label{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.06em;color:#9AAAC7;text-transform:uppercase;}
+  .cuota-value{font-family:'IBM Plex Mono',monospace;font-size:21px;font-weight:600;color:#F7F5F0;}
+  .cuota-value-muted{font-family:'IBM Plex Mono',monospace;font-size:17px;color:#7C8CA8;text-decoration:line-through;}
   .cuota-input{font-family:'IBM Plex Mono',monospace;font-size:16px;background:var(--ink2);border:1px solid #3A4A6B;
     border-radius:4px;color:#F7F5F0;padding:4px 6px;width:90px;}
   .cuota-reduccion{display:flex;align-items:center;gap:5px;font-family:'IBM Plex Mono',monospace;font-size:15px;
@@ -48,29 +48,31 @@
   .section-label{display:flex;align-items:center;gap:6px;font-family:'IBM Plex Mono',monospace;font-size:11px;
     letter-spacing:.07em;color:var(--brass);margin:20px 0 10px;}
   .hermanos-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;}
-  .hermano-card{background:var(--card);border:1px solid var(--border);border-radius:7px;padding:10px 12px;}
-  .hermano-nombre{font-size:13px;font-weight:600;margin-bottom:4px;}
+  .hermano-card{background:var(--card);border:1px solid var(--border);border-radius:7px;padding:10px 12px;
+    transition:border-color .15s ease, box-shadow .15s ease, transform .15s ease;}
+  .hermano-card.clicable:hover{border-color:var(--brass);box-shadow:0 3px 10px rgba(138,90,43,.15);transform:translateY(-1px);}
+  .hermano-nombre{font-size:14px;font-weight:600;margin-bottom:4px;}
   .hermano-name-input{font-size:13px;font-weight:600;margin-bottom:4px;border:1px solid #C9C0A9;border-radius:4px;
     padding:2px 4px;width:100%;background:#fff;}
-  .hermano-monto{font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600;color:var(--brass);margin-bottom:6px;}
+  .hermano-monto{font-family:'IBM Plex Mono',monospace;font-size:17px;font-weight:600;color:var(--brass);margin-bottom:6px;}
   .bar-track{height:5px;background:var(--border);border-radius:3px;overflow:hidden;}
   .bar-fill{height:100%;background:var(--brass);border-radius:3px;}
   .totals-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-top:12px;}
   .total-box{background:var(--card);border-radius:7px;padding:10px 12px;text-align:center;}
-  .total-label{font-family:'IBM Plex Mono',monospace;font-size:10px;color:#7A6E5C;margin-bottom:4px;}
-  .total-value{font-family:'IBM Plex Mono',monospace;font-size:16px;font-weight:600;}
+  .total-label{font-family:'IBM Plex Mono',monospace;font-size:11px;color:#7A6E5C;margin-bottom:4px;}
+  .total-value{font-family:'IBM Plex Mono',monospace;font-size:17px;font-weight:600;}
   .total-value.sage{color:var(--sage);} .total-value.muted{color:var(--brass2);}
   .form{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:14px;display:flex;
     flex-direction:column;gap:8px;}
   .form-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
   .field-col{display:flex;flex-direction:column;gap:3px;min-width:0;}
-  .field-label{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);}
+  .field-label{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);}
   input[type="file"]{padding:6px 8px;background:#fff;}
   .constancia-link{display:inline-flex;align-items:center;gap:4px;font-family:'IBM Plex Mono',monospace;font-size:10px;
     color:var(--brass);border:1px solid var(--brass);border-radius:10px;padding:3px 8px;text-decoration:none;flex-shrink:0;}
   .ledger-registro{font-size:10px;color:#B4A98F;flex-basis:100%;}
-  .motivo-tag{font-family:'IBM Plex Mono',monospace;font-size:10px;border:1px solid;border-radius:10px;padding:1px 7px;}
-  .hermano-desglose{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);margin-bottom:4px;}
+  .motivo-tag{font-family:'IBM Plex Mono',monospace;font-size:11px;border:1px solid;border-radius:10px;padding:2px 8px;}
+  .hermano-desglose{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);margin-bottom:4px;}
   .uploading{opacity:.7;pointer-events:none;}
   .whoami-btn{background:#fff;border:1px solid var(--border);border-radius:6px;padding:12px 16px;cursor:pointer;
     font-size:14px;font-weight:600;color:var(--ink);}
@@ -78,9 +80,9 @@
   .whoami-btn.encargado{background:var(--ink);color:#F7F5F0;border-color:var(--ink);}
   .cambiar-rol{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);background:none;border:none;
     cursor:pointer;text-decoration:underline;padding:0;}
-  .medio-tag{font-family:'IBM Plex Mono',monospace;font-size:10px;border:1px solid;border-radius:10px;padding:1px 7px;
+  .medio-tag{font-family:'IBM Plex Mono',monospace;font-size:11px;border:1px solid;border-radius:10px;padding:2px 8px;
     color:var(--muted);border-color:var(--border);}
-  .hermano-fijo{font-size:13px;padding:8px 10px;border-radius:5px;border:1px solid #D3CBB8;background:#F3EFE4;
+  .hermano-fijo{font-size:14px;padding:8px 10px;border-radius:5px;border:1px solid #D3CBB8;background:#F3EFE4;
     display:flex;align-items:center;font-weight:600;}
   input,select{font-size:13px;padding:8px 10px;border-radius:5px;border:1px solid #D3CBB8;background:#fff;
     color:var(--ink);min-width:0;font-family:inherit;}
@@ -93,12 +95,12 @@
   .ledger-row{display:flex;flex-direction:column;gap:6px;padding:10px 14px;border-bottom:1px solid #EFEADB;
     background:#FDFCF8;}
   .ledger-row-top{display:flex;justify-content:space-between;align-items:center;gap:10px;}
-  .ledger-date{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);}
+  .ledger-date{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted);}
   .ledger-mid{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0;}
-  .ledger-hermano{font-size:13px;font-weight:600;}
-  .tipo-tag{font-family:'IBM Plex Mono',monospace;font-size:10px;border:1px solid;border-radius:10px;padding:1px 7px;white-space:nowrap;}
-  .nota{font-size:12px;color:var(--muted);font-style:italic;}
-  .ledger-monto{font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:600;flex-shrink:0;}
+  .ledger-hermano{font-size:14px;font-weight:600;}
+  .tipo-tag{font-family:'IBM Plex Mono',monospace;font-size:11px;border:1px solid;border-radius:10px;padding:2px 8px;white-space:nowrap;}
+  .nota{font-size:13px;color:var(--muted);font-style:italic;}
+  .ledger-monto{font-family:'IBM Plex Mono',monospace;font-size:16px;font-weight:600;flex-shrink:0;}
   .ledger-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
   .estado-btn{display:flex;align-items:center;gap:4px;font-family:'IBM Plex Mono',monospace;font-size:10px;
     border:1px solid;border-radius:10px;padding:3px 8px;cursor:pointer;background:transparent;flex-shrink:0;white-space:nowrap;}
@@ -115,7 +117,7 @@
   .paginacion button{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:6px 12px;
     cursor:pointer;font-family:inherit;font-size:12px;color:var(--ink);}
   .paginacion button:disabled{opacity:.4;cursor:default;}
-  .ledger-numero{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);}
+  .ledger-numero{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);}
   .view-btn{background:transparent;border:1px solid var(--brass);color:var(--brass);border-radius:6px;
     cursor:pointer;padding:4px 7px;flex-shrink:0;font-size:13px;text-decoration:none;display:inline-flex;}
   .modal-overlay{position:fixed;inset:0;background:rgba(22,35,61,.45);display:flex;align-items:center;
@@ -224,7 +226,7 @@
 
       <div class="tabs" id="tabs-row">
         <button class="tab-btn active" data-tab="yapes" id="tab-btn-yapes">📊 Todos los Aportes</button>
-        <button class="tab-btn" data-tab="yapes-gustavo" id="tab-btn-yapes-gustavo">🙋 Aportes Gustavo Reyna</button>
+        <span id="tabs-dinamicas" style="display:inline-flex;gap:6px;flex-wrap:wrap;"></span>
         <button class="tab-btn" data-tab="banco" id="tab-btn-banco">🏦 Pagos al Banco</button>
       </div>
 
@@ -239,7 +241,7 @@
             <div class="total-value sage" id="total-verificado"></div>
           </div>
           <div class="total-box">
-            <div class="total-label">Pendiente por verificar</div>
+            <div class="total-label">Pendiente verificar</div>
             <div class="total-value muted" id="total-pendiente"></div>
           </div>
           <div class="total-box">
@@ -344,18 +346,21 @@
         </div>
 
         <div class="section-label">📊 DESGLOSE POR TIPO DE PAGO</div>
-        <div class="totals-row">
-          <div class="total-box">
-            <div class="total-label">Reducción de cuota</div>
-            <div class="total-value" id="total-banco-cuota"></div>
+        <div class="hermanos-grid">
+          <div class="hermano-card">
+            <div class="hermano-nombre">Reducción de Cuota</div>
+            <div class="hermano-monto" id="total-banco-cuota"></div>
+            <div class="hermano-desglose">Capital: <span id="total-banco-cuota-capital"></span> · Interés: <span id="total-banco-cuota-interes"></span></div>
           </div>
-          <div class="total-box">
-            <div class="total-label">Reducción de plazo</div>
-            <div class="total-value" id="total-banco-plazo"></div>
+          <div class="hermano-card">
+            <div class="hermano-nombre">Reducción de Plazo</div>
+            <div class="hermano-monto" id="total-banco-plazo"></div>
+            <div class="hermano-desglose">Capital: <span id="total-banco-plazo-capital"></span> · Interés: <span id="total-banco-plazo-interes"></span></div>
           </div>
-          <div class="total-box">
-            <div class="total-label">Cuota mensual</div>
-            <div class="total-value" id="total-banco-mensual"></div>
+          <div class="hermano-card">
+            <div class="hermano-nombre">Pago de Cuota Mensual</div>
+            <div class="hermano-monto" id="total-banco-mensual"></div>
+            <div class="hermano-desglose">Capital: <span id="total-banco-mensual-capital"></span> · Interés: <span id="total-banco-mensual-interes"></span></div>
           </div>
         </div>
 
@@ -523,7 +528,8 @@ let rol = null; // { tipo: "hermano", hermanoIdx: 0 } | { tipo: "encargado" }
 const PAGE_SIZE = 10;
 let yapesFiltro = { estado: "todos", hermano: "todos", desde: "", hasta: "", numero: "", numOp: "", orden: "fecha_desc" };
 let yapesPagina = 1;
-let vistaAdminAportes = "todos"; // "todos" | "gustavo" — cuál de las 2 pestañas de Aportes está activa
+let vistaAdminAportes = "todos"; // "todos" | "0" | "1" | "2"... (índice de la persona cuya pestaña está activa)
+let tabsAbiertas = []; // índices de personas con una pestaña dinámica abierta
 let bancoFiltro = { desde: "", hasta: "", numero: "", numOp: "", orden: "fecha_desc" };
 let bancoPagina = 1;
 
@@ -542,7 +548,6 @@ function guardarRol(nuevoRol, persistir) {
 function aplicarRol() {
   const esHermano = rol && rol.tipo === "hermano";
   document.getElementById("tab-btn-banco").hidden = esHermano;
-  document.getElementById("tab-btn-yapes-gustavo").hidden = esHermano;
   document.getElementById("edit-config-btn").hidden = esHermano;
   document.getElementById("header-title").textContent = esHermano
     ? `Cuenta: ${nombreActual()}`
@@ -550,6 +555,8 @@ function aplicarRol() {
   document.getElementById("tab-btn-yapes").textContent = esHermano ? "📱 Mis Aportes" : "📊 Todos los Aportes";
   if (esHermano) {
     vistaAdminAportes = "todos";
+    tabsAbiertas = [];
+    document.getElementById("tabs-dinamicas").innerHTML = "";
     document.getElementById("tab-yapes").hidden = false;
     document.getElementById("tab-banco").hidden = true;
     document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
@@ -755,14 +762,73 @@ document.querySelectorAll(".tab-btn").forEach((btn) => {
   btn.addEventListener("click", () => {
     document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
     btn.classList.add("active");
-    const tab = btn.dataset.tab; // "yapes" | "yapes-gustavo" | "banco"
-    document.getElementById("tab-yapes").hidden = !(tab === "yapes" || tab === "yapes-gustavo");
+    const tab = btn.dataset.tab; // "yapes" | "banco"
+    document.getElementById("tab-yapes").hidden = tab !== "yapes";
     document.getElementById("tab-banco").hidden = tab !== "banco";
-    vistaAdminAportes = tab === "yapes-gustavo" ? "gustavo" : "todos";
+    vistaAdminAportes = "todos";
     yapesPagina = 1;
+    renderTabsDinamicas();
     renderAll();
   });
 });
+
+// Abre (o activa, si ya estaba abierta) la pestaña dinámica de una persona,
+// al hacer clic en su tarjeta dentro de "Todos los Aportes".
+function abrirTabPersona(idx) {
+  if (!tabsAbiertas.includes(idx)) tabsAbiertas.push(idx);
+  vistaAdminAportes = String(idx);
+  document.getElementById("tab-yapes").hidden = false;
+  document.getElementById("tab-banco").hidden = true;
+  document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
+  yapesPagina = 1;
+  renderTabsDinamicas();
+  renderAll();
+}
+
+function cerrarTabPersona(idx) {
+  tabsAbiertas = tabsAbiertas.filter((i) => i !== idx);
+  if (vistaAdminAportes === String(idx)) {
+    vistaAdminAportes = "todos";
+    document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
+    document.getElementById("tab-btn-yapes").classList.add("active");
+  }
+  renderTabsDinamicas();
+  renderAll();
+}
+
+function renderTabsDinamicas() {
+  const cont = document.getElementById("tabs-dinamicas");
+  cont.innerHTML = "";
+  tabsAbiertas.forEach((idx) => {
+    const wrap = document.createElement("span");
+    wrap.style.cssText = "display:inline-flex;align-items:center;";
+    const btn = document.createElement("button");
+    btn.className = "tab-btn" + (vistaAdminAportes === String(idx) ? " active" : "");
+    btn.textContent = "🙋 Aportes " + NOMBRES_HERMANOS[idx];
+    btn.addEventListener("click", () => {
+      vistaAdminAportes = String(idx);
+      document.getElementById("tab-yapes").hidden = false;
+      document.getElementById("tab-banco").hidden = true;
+      document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
+      yapesPagina = 1;
+      renderTabsDinamicas();
+      renderAll();
+    });
+    const cerrar = document.createElement("button");
+    cerrar.textContent = "✕";
+    cerrar.title = "Cerrar pestaña";
+    cerrar.style.cssText = "background:transparent;border:none;cursor:pointer;color:var(--muted);font-size:12px;font-weight:700;margin-left:-4px;padding:6px 8px;";
+    cerrar.addEventListener("click", (e) => { e.stopPropagation(); cerrarTabPersona(idx); });
+    wrap.appendChild(btn);
+    wrap.appendChild(cerrar);
+    cont.appendChild(wrap);
+  });
+  // vuelve a marcar "activa" la pestaña dinámica correcta, si aplica
+  if (vistaAdminAportes !== "todos") {
+    const btnActivo = Array.from(cont.querySelectorAll(".tab-btn")).find((b) => b.textContent === "🙋 Aportes " + NOMBRES_HERMANOS[Number(vistaAdminAportes)]);
+    if (btnActivo) btnActivo.classList.add("active");
+  }
+}
 
 // ---------- CONFIG EDIT ----------
 document.getElementById("edit-config-btn").addEventListener("click", async () => {
@@ -1032,11 +1098,18 @@ function renderAll() {
   grid.innerHTML = "";
   const indicesAMostrar = rol.tipo === "hermano"
     ? [rol.hermanoIdx]
-    : (vistaAdminAportes === "gustavo" ? [IDX_ADMIN_APORTANTE] : NOMBRES_HERMANOS.map((_, i) => i));
+    : (vistaAdminAportes !== "todos" ? [Number(vistaAdminAportes)] : NOMBRES_HERMANOS.map((_, i) => i));
   indicesAMostrar.forEach((idx) => {
     const nombre = NOMBRES_HERMANOS[idx];
     const card = document.createElement("div");
     card.className = "hermano-card";
+    // El Administrador puede tocar la tarjeta para abrir una pestaña filtrada a esa persona
+    if (rol.tipo !== "hermano") {
+      card.classList.add("clicable");
+      card.style.cursor = "pointer";
+      card.title = `Ver solo los aportes de ${nombre}`;
+      card.addEventListener("click", () => abrirTabPersona(idx));
+    }
     card.innerHTML = `<div class="hermano-nombre">${escapeHtml(nombre)}</div>`;
     const monto = document.createElement("div");
     monto.className = "hermano-monto";
@@ -1067,13 +1140,13 @@ function renderAll() {
     selEl.value = prevVal || String(IDX_ADMIN_APORTANTE);
   }
 
-  // hermano efectivo a filtrar: propio (si es hermano), Gustavo (si es esa
-  // pestaña "Aportes Gustavo Reyna"), o lo que diga el filtro manual (pestaña "Todos")
+  // hermano efectivo a filtrar: propio (si es hermano), la persona de la
+  // pestaña dinámica activa, o lo que diga el filtro manual (pestaña "Todos")
   const hermanoFiltroEfectivo = rol.tipo === "hermano" ? String(rol.hermanoIdx)
-    : vistaAdminAportes === "gustavo" ? String(IDX_ADMIN_APORTANTE)
+    : vistaAdminAportes !== "todos" ? vistaAdminAportes
     : yapesFiltro.hermano;
 
-  // totals yapes — respetan la pestaña activa (Todos / solo Gustavo / solo el hermano)
+  // totals yapes — respetan la pestaña activa (Todos / una persona / el propio hermano)
   const yapesParaTotales = hermanoFiltroEfectivo === "todos" ? yapes : yapes.filter((y) => String(y.hermano) === hermanoFiltroEfectivo);
   const verificado = yapesParaTotales.filter((y) => y.estado === "verificado").reduce((s, y) => s + y.monto, 0);
   const pendiente = yapesParaTotales.filter((y) => y.estado === "pendiente").reduce((s, y) => s + y.monto, 0);
@@ -1087,9 +1160,9 @@ function renderAll() {
   document.getElementById("total-motivo-mensual").textContent = formatSoles(totalMensual);
 
   // filtro por hermano (poblado dinámicamente, oculto si el rol es hermano o si
-  // estamos en la pestaña "Aportes Gustavo Reyna", donde ya se sabe quién es)
+  // hay una pestaña dinámica de una persona específica activa)
   const selFiltroHermano = document.getElementById("filtro-yape-hermano");
-  if (rol.tipo === "hermano" || vistaAdminAportes === "gustavo") {
+  if (rol.tipo === "hermano" || vistaAdminAportes !== "todos") {
     selFiltroHermano.style.display = "none";
   } else {
     selFiltroHermano.style.display = "";
@@ -1160,16 +1233,37 @@ function renderAll() {
     });
   }
 
-  // totals banco
+  // totals banco (general, suma de las 3 categorías)
   const totalBanco = pagosBanco.reduce((s, p) => s + p.monto, 0);
   const totalCapital = pagosBanco.reduce((s, p) => s + (p.montoCapital || p.monto), 0);
   const totalInteres = pagosBanco.reduce((s, p) => s + (p.montoCapital ? p.monto - p.montoCapital : 0), 0);
   document.getElementById("total-banco").textContent = formatSoles(totalBanco);
   document.getElementById("total-capital").textContent = formatSoles(totalCapital);
   document.getElementById("total-interes").textContent = formatSoles(totalInteres);
-  document.getElementById("total-banco-cuota").textContent = formatSoles(pagosBanco.filter((p) => p.tipo === "reduccion_cuota" || p.tipo === "cuota").reduce((s, p) => s + p.monto, 0));
-  document.getElementById("total-banco-plazo").textContent = formatSoles(pagosBanco.filter((p) => p.tipo === "reduccion_plazo" || p.tipo === "plazo").reduce((s, p) => s + p.monto, 0));
-  document.getElementById("total-banco-mensual").textContent = formatSoles(pagosBanco.filter((p) => p.tipo === "cuota_mensual").reduce((s, p) => s + p.monto, 0));
+
+  // desglose por categoría: cada una con su propio monto, capital e interés
+  // (para que el capital de "cuota mensual" nunca se mezcle con el de "reducción de cuota")
+  function desgloseCategoria(pagos) {
+    const monto = pagos.reduce((s, p) => s + p.monto, 0);
+    const capital = pagos.reduce((s, p) => s + (p.montoCapital || p.monto), 0);
+    const interes = pagos.reduce((s, p) => s + (p.montoCapital ? p.monto - p.montoCapital : 0), 0);
+    return { monto, capital, interes };
+  }
+  const dCuota = desgloseCategoria(pagosBanco.filter((p) => p.tipo === "reduccion_cuota" || p.tipo === "cuota"));
+  const dPlazo = desgloseCategoria(pagosBanco.filter((p) => p.tipo === "reduccion_plazo" || p.tipo === "plazo"));
+  const dMensual = desgloseCategoria(pagosBanco.filter((p) => p.tipo === "cuota_mensual"));
+
+  document.getElementById("total-banco-cuota").textContent = formatSoles(dCuota.monto);
+  document.getElementById("total-banco-cuota-capital").textContent = formatSoles(dCuota.capital);
+  document.getElementById("total-banco-cuota-interes").textContent = formatSoles(dCuota.interes);
+
+  document.getElementById("total-banco-plazo").textContent = formatSoles(dPlazo.monto);
+  document.getElementById("total-banco-plazo-capital").textContent = formatSoles(dPlazo.capital);
+  document.getElementById("total-banco-plazo-interes").textContent = formatSoles(dPlazo.interes);
+
+  document.getElementById("total-banco-mensual").textContent = formatSoles(dMensual.monto);
+  document.getElementById("total-banco-mensual-capital").textContent = formatSoles(dMensual.capital);
+  document.getElementById("total-banco-mensual-interes").textContent = formatSoles(dMensual.interes);
 
   // banco ledger: aplicar filtros
   let bancoFiltrado = pagosBanco.filter((p) => {
