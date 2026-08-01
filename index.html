@@ -242,13 +242,11 @@
 
       <div id="aviso-pendientes" class="aviso-pendientes" hidden></div>
 
-      <div class="section-label" id="chart-label" hidden>📉 PROGRESO DE LA CUOTA</div>
-      <div id="chart-cuota-container" hidden style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px 14px 4px;margin-bottom:16px;"></div>
-
       <div class="tabs" id="tabs-row">
         <button class="tab-btn active" data-tab="yapes" id="tab-btn-yapes">📊 Todos los Aportes</button>
         <span id="tabs-dinamicas" style="display:inline-flex;gap:6px;flex-wrap:wrap;"></span>
         <button class="tab-btn" data-tab="banco" id="tab-btn-banco">🏦 Pagos al Banco</button>
+        <button class="tab-btn" data-tab="progreso" id="tab-btn-progreso">📉 Progreso</button>
       </div>
 
       <!-- YAPES TAB -->
@@ -442,6 +440,12 @@
         </div>
       </div>
 
+      <!-- PROGRESO TAB -->
+      <div id="tab-progreso" hidden>
+        <div class="section-label" id="chart-label">📉 PROGRESO DE LA CUOTA</div>
+        <div id="chart-cuota-container" style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px 14px 4px;"></div>
+      </div>
+
       <div class="footer">Datos privados de acceso individual con usuario y clave.</div>
     </div>
   </div>
@@ -589,6 +593,7 @@ function aplicarRol() {
     document.getElementById("tabs-dinamicas").innerHTML = "";
     document.getElementById("tab-yapes").hidden = false;
     document.getElementById("tab-banco").hidden = true;
+    document.getElementById("tab-progreso").hidden = true;
     document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
     document.querySelector('.tab-btn[data-tab="yapes"]').classList.add("active");
   } else {
@@ -800,9 +805,10 @@ document.querySelectorAll(".tab-btn").forEach((btn) => {
   btn.addEventListener("click", () => {
     document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
     btn.classList.add("active");
-    const tab = btn.dataset.tab; // "yapes" | "banco"
+    const tab = btn.dataset.tab; // "yapes" | "banco" | "progreso"
     document.getElementById("tab-yapes").hidden = tab !== "yapes";
     document.getElementById("tab-banco").hidden = tab !== "banco";
+    document.getElementById("tab-progreso").hidden = tab !== "progreso";
     vistaAdminAportes = "todos";
     yapesPagina = 1;
     renderTabsDinamicas();
@@ -817,6 +823,7 @@ function abrirTabPersona(idx) {
   vistaAdminAportes = String(idx);
   document.getElementById("tab-yapes").hidden = false;
   document.getElementById("tab-banco").hidden = true;
+  document.getElementById("tab-progreso").hidden = true;
   document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
   yapesPagina = 1;
   renderTabsDinamicas();
@@ -847,6 +854,7 @@ function renderTabsDinamicas() {
       vistaAdminAportes = String(idx);
       document.getElementById("tab-yapes").hidden = false;
       document.getElementById("tab-banco").hidden = true;
+      document.getElementById("tab-progreso").hidden = true;
       document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
       yapesPagina = 1;
       renderTabsDinamicas();
@@ -1117,22 +1125,18 @@ function ordenarPor(lista, orden) {
 }
 // Dibuja un gráfico simple (SVG, sin librerías) con el progreso de la cuota
 function dibujarGraficoCuota() {
-  const label = document.getElementById("chart-label");
   const cont = document.getElementById("chart-cuota-container");
   // Mientras no haya historial guardado (o si solo cambió una vez), igual
   // mostramos al menos Inicio → Actual con los valores que ya tenemos.
   if (config.cuotaInicial === config.cuotaActual && historialCuota.length === 0) {
-    label.hidden = true;
-    cont.hidden = true;
+    cont.innerHTML = `<div class="empty">Aún no hay cambios de cuota registrados. En cuanto edites la "Cuota actual" por primera vez, va a aparecer aquí.</div>`;
     return;
   }
-  label.hidden = false;
-  cont.hidden = false;
 
   const puntos = historialCuota.length > 0
     ? [{ fecha: null, valor: config.cuotaInicial, etiqueta: "Inicio" }, ...historialCuota]
     : [{ fecha: null, valor: config.cuotaInicial, etiqueta: "Inicio" }, { fecha: null, valor: config.cuotaActual, etiqueta: "Actual" }];
-  const w = 620, h = 170, padL = 8, padR = 8, padT = 26, padB = 26;
+  const w = 620, h = 170, padL = 46, padR = 46, padT = 26, padB = 26;
   const valores = puntos.map((p) => p.valor);
   const max = Math.max(...valores), min = Math.min(...valores);
   const rango = Math.max(1, max - min);
@@ -1256,6 +1260,7 @@ function renderAll() {
       document.getElementById("tab-btn-yapes").classList.add("active");
       document.getElementById("tab-yapes").hidden = false;
       document.getElementById("tab-banco").hidden = true;
+      document.getElementById("tab-progreso").hidden = true;
       vistaAdminAportes = "todos";
       yapesFiltro.estado = "pendiente";
       document.getElementById("filtro-yape-estado").value = "pendiente";
@@ -1475,7 +1480,7 @@ function descargarCsv(nombreArchivo, filas) {
   URL.revokeObjectURL(url);
 }
 document.getElementById("export-yapes-btn").addEventListener("click", () => {
-  const filas = [["N° registro", "Fecha de pago", "Persona", "Motivo", "Medio de pago", "N° de Operación", "Monto (S/)", "Estado", "Nota"]];
+  const filas = [["N° registro", "Fecha de pago", "Persona", "Motivo", "Medio de pago", "N° de Operación", "Monto (S/)", "Estado", "Nota", "Link constancia"]];
   ultimosYapesFiltrados.forEach((y) => {
     filas.push([
       formatNumero(y.numero),
@@ -1487,12 +1492,13 @@ document.getElementById("export-yapes-btn").addEventListener("click", () => {
       y.monto,
       y.estado,
       y.nota || "",
+      y.imagenUrl || "",
     ]);
   });
   descargarCsv(`aportes_${new Date().toISOString().slice(0, 10)}.csv`, filas);
 });
 document.getElementById("export-banco-btn").addEventListener("click", () => {
-  const filas = [["N° registro", "Fecha", "Tipo", "Monto (S/)", "Monto a capital (S/)", "N° de Operación", "Nota"]];
+  const filas = [["N° registro", "Fecha", "Tipo", "Monto (S/)", "Monto a capital (S/)", "N° de Operación", "Nota", "Link constancia"]];
   ultimoBancoFiltrado.forEach((p) => {
     filas.push([
       formatNumero(p.numero),
@@ -1502,6 +1508,7 @@ document.getElementById("export-banco-btn").addEventListener("click", () => {
       p.montoCapital ?? "",
       p.numeroOperacion || "",
       p.nota || "",
+      p.imagenUrl || "",
     ]);
   });
   descargarCsv(`pagos_banco_${new Date().toISOString().slice(0, 10)}.csv`, filas);
