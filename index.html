@@ -128,9 +128,11 @@
   .ledger-numero{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);}
   .view-btn{background:transparent;border:1px solid var(--brass);color:var(--brass);border-radius:6px;
     cursor:pointer;padding:4px 7px;flex-shrink:0;font-size:13px;text-decoration:none;display:inline-flex;}
-  .aviso-pendientes{display:flex;align-items:center;gap:8px;background:#FCF3E3;border:1px solid #E8C98A;
-    color:#7A5A1E;font-size:13px;font-weight:600;padding:9px 14px;border-radius:7px;margin:0 0 16px;cursor:pointer;}
-  .aviso-pendientes:hover{background:#FAEBCB;}
+  .aviso-pendientes{display:flex;align-items:center;gap:10px;background:#FDECEA;border:2px solid #C0392B;
+    color:#8B241A;font-size:14px;font-weight:700;padding:12px 16px;border-radius:8px;margin:0 0 16px;cursor:pointer;
+    box-shadow:0 2px 8px rgba(192,57,43,.18);}
+  .aviso-pendientes:hover{background:#FBD9D5;}
+  .aviso-pendientes::before{content:"⚠️";font-size:18px;flex-shrink:0;}
   .export-btn{background:transparent;border:1px solid var(--brass);color:var(--brass);border-radius:6px;
     font-family:'IBM Plex Mono',monospace;font-size:11px;padding:5px 10px;cursor:pointer;}
   .export-btn:hover{background:var(--brass);color:#fff;}
@@ -589,6 +591,9 @@ function aplicarRol() {
     document.getElementById("tab-banco").hidden = true;
     document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
     document.querySelector('.tab-btn[data-tab="yapes"]').classList.add("active");
+  } else {
+    // Por defecto, el Administrador entra viendo su propia pestaña de aportes
+    abrirTabPersona(IDX_ADMIN_APORTANTE);
   }
 }
 
@@ -1114,11 +1119,19 @@ function ordenarPor(lista, orden) {
 function dibujarGraficoCuota() {
   const label = document.getElementById("chart-label");
   const cont = document.getElementById("chart-cuota-container");
-  if (historialCuota.length === 0) { label.hidden = true; cont.hidden = true; return; }
+  // Mientras no haya historial guardado (o si solo cambió una vez), igual
+  // mostramos al menos Inicio → Actual con los valores que ya tenemos.
+  if (config.cuotaInicial === config.cuotaActual && historialCuota.length === 0) {
+    label.hidden = true;
+    cont.hidden = true;
+    return;
+  }
   label.hidden = false;
   cont.hidden = false;
 
-  const puntos = [{ fecha: null, valor: config.cuotaInicial }, ...historialCuota];
+  const puntos = historialCuota.length > 0
+    ? [{ fecha: null, valor: config.cuotaInicial, etiqueta: "Inicio" }, ...historialCuota]
+    : [{ fecha: null, valor: config.cuotaInicial, etiqueta: "Inicio" }, { fecha: null, valor: config.cuotaActual, etiqueta: "Actual" }];
   const w = 620, h = 170, padL = 8, padR = 8, padT = 26, padB = 26;
   const valores = puntos.map((p) => p.valor);
   const max = Math.max(...valores), min = Math.min(...valores);
@@ -1132,7 +1145,7 @@ function dibujarGraficoCuota() {
   const path = coords.map((c, i) => (i === 0 ? "M" : "L") + c.x.toFixed(1) + "," + c.y.toFixed(1)).join(" ");
   const puntosSvg = coords.map((c) => `<circle cx="${c.x.toFixed(1)}" cy="${c.y.toFixed(1)}" r="4" fill="#8A5A2B"/>`).join("");
   const valoresSvg = coords.map((c) => `<text x="${c.x.toFixed(1)}" y="${(c.y - 10).toFixed(1)}" font-size="11" fill="#16233D" text-anchor="middle" font-weight="600" font-family="'IBM Plex Mono', monospace">S/${c.valor}</text>`).join("");
-  const fechasSvg = coords.map((c) => `<text x="${c.x.toFixed(1)}" y="${h - 6}" font-size="10" fill="#8A7C68" text-anchor="middle" font-family="'IBM Plex Mono', monospace">${c.fecha ? formatFecha(c.fecha) : "Inicio"}</text>`).join("");
+  const fechasSvg = coords.map((c) => `<text x="${c.x.toFixed(1)}" y="${h - 6}" font-size="10" fill="#8A7C68" text-anchor="middle" font-family="'IBM Plex Mono', monospace">${c.fecha ? formatFecha(c.fecha) : (c.etiqueta || "")}</text>`).join("");
 
   cont.innerHTML = `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto;display:block;">
     <path d="${path}" fill="none" stroke="#8A5A2B" stroke-width="2.5"/>
@@ -1236,8 +1249,8 @@ function renderAll() {
     const totalPend = pendientesGlobal.reduce((s, y) => s + y.monto, 0);
     avisoEl.hidden = false;
     avisoEl.textContent = rol.tipo === "hermano"
-      ? `⏳ Tienes ${pendientesGlobal.length} pago(s) tuyo(s) por verificar (${formatSoles(totalPend)}) — tócalo para verlos`
-      : `⏳ Hay ${pendientesGlobal.length} pago(s) pendiente(s) por verificar (${formatSoles(totalPend)}) — toca para verlos`;
+      ? `Tienes ${pendientesGlobal.length} pago(s) tuyo(s) por verificar (${formatSoles(totalPend)}) — tócalo para verlos`
+      : `Hay ${pendientesGlobal.length} pago(s) pendiente(s) por verificar (${formatSoles(totalPend)}) — toca para verlos`;
     avisoEl.onclick = () => {
       document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
       document.getElementById("tab-btn-yapes").classList.add("active");
@@ -1445,10 +1458,12 @@ document.addEventListener("click", async (e) => {
 
 function escapeCsv(v) {
   const s = String(v ?? "");
-  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 function descargarCsv(nombreArchivo, filas) {
-  const csv = filas.map((fila) => fila.map(escapeCsv).join(",")).join("\r\n");
+  // Punto y coma (;), no coma — es el separador que Excel en español/Perú
+  // reconoce automáticamente al abrir el archivo (con coma, todo cae en una sola columna).
+  const csv = filas.map((fila) => fila.map(escapeCsv).join(";")).join("\r\n");
   const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
