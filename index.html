@@ -167,7 +167,7 @@
   <div id="login-step2" hidden style="display:flex;flex-direction:column;gap:10px;width:min(240px,86vw);align-items:center;">
     <div id="login-nombre-elegido" style="font-weight:600;"></div>
     <input id="login-clave" type="password" placeholder="Tu clave" inputmode="numeric" />
-    <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#8A7C68;">
+    <label id="login-recordar-label" style="display:flex;align-items:center;gap:6px;font-size:12px;color:#8A7C68;">
       <input type="checkbox" id="login-recordar" /> Mantener sesión iniciada en este dispositivo
     </label>
     <button id="login-btn">Entrar</button>
@@ -223,8 +223,9 @@
       </div>
 
       <div class="tabs" id="tabs-row">
-        <button class="tab-btn active" data-tab="yapes">📱 Aportes</button>
-        <button class="tab-btn" data-tab="banco" id="tab-btn-banco">🏦 Pagos al banco</button>
+        <button class="tab-btn active" data-tab="yapes" id="tab-btn-yapes">📊 Todos los Aportes</button>
+        <button class="tab-btn" data-tab="yapes-gustavo" id="tab-btn-yapes-gustavo">🙋 Aportes Gustavo Reyna</button>
+        <button class="tab-btn" data-tab="banco" id="tab-btn-banco">🏦 Pagos al Banco</button>
       </div>
 
       <!-- YAPES TAB -->
@@ -268,14 +269,16 @@
                 <option value="yape">Yape</option>
                 <option value="plin">Plin</option>
                 <option value="efectivo">Efectivo</option>
+                <option value="transferencia">Transferencia bancaria</option>
+                <option value="otro">Otro</option>
               </select>
             </div>
             <div class="field-col">
               <label class="field-label">Motivo</label>
               <select id="yape-motivo">
-                <option value="reduccion_cuota">Importe Reducción de Cuota</option>
-                <option value="reduccion_plazo">Importe Reducción de Plazo</option>
-                <option value="cuota_mensual">Importe Cuota Mensual</option>
+                <option value="reduccion_cuota">Reducción de Cuota</option>
+                <option value="reduccion_plazo">Reducción de Plazo</option>
+                <option value="cuota_mensual">Pago de Cuota Mensual</option>
                 <option value="otros">Otros</option>
               </select>
             </div>
@@ -295,7 +298,11 @@
             </div>
           </div>
           <div class="form-row">
-            <input id="yape-nota" placeholder="Nota (opcional)" style="grid-column:1/-1" />
+            <div class="field-col">
+              <label class="field-label">N° de Operación (opcional)</label>
+              <input id="yape-num-operacion" type="text" placeholder="Ej. 000123456" />
+            </div>
+            <input id="yape-nota" placeholder="Nota (opcional)" style="grid-column:span 2" />
           </div>
           <button class="add-btn" id="yape-add-btn">Registrar pago</button>
           <button class="cambiar-rol" id="yape-cancelar-edicion" hidden style="margin-top:4px;">Cancelar edición</button>
@@ -312,6 +319,7 @@
           <input id="filtro-yape-desde" type="date" title="Desde" />
           <input id="filtro-yape-hasta" type="date" title="Hasta" />
           <input id="filtro-yape-numero" type="text" placeholder="N° registro" inputmode="numeric" />
+          <input id="filtro-yape-num-op" type="text" placeholder="N° de Operación" />
           <select id="filtro-yape-orden">
             <option value="fecha_desc">Fecha: más reciente</option>
             <option value="fecha_asc">Fecha: más antigua</option>
@@ -329,18 +337,25 @@
 
       <!-- BANCO TAB -->
       <div id="tab-banco" hidden>
+        <div class="hermano-card" style="margin-bottom:12px;">
+          <div class="hermano-nombre">Total pagado al banco</div>
+          <div class="hermano-monto" id="total-banco"></div>
+          <div class="hermano-desglose">A capital: <span id="total-capital"></span> · Interés/seguro: <span id="total-interes"></span></div>
+        </div>
+
+        <div class="section-label">📊 DESGLOSE POR TIPO DE PAGO</div>
         <div class="totals-row">
           <div class="total-box">
-            <div class="total-label">Total pagado al banco</div>
-            <div class="total-value" id="total-banco"></div>
+            <div class="total-label">Reducción de cuota</div>
+            <div class="total-value" id="total-banco-cuota"></div>
           </div>
           <div class="total-box">
-            <div class="total-label">A capital (aprox.)</div>
-            <div class="total-value sage" id="total-capital"></div>
+            <div class="total-label">Reducción de plazo</div>
+            <div class="total-value" id="total-banco-plazo"></div>
           </div>
           <div class="total-box">
-            <div class="total-label">Interés/seguro</div>
-            <div class="total-value muted" id="total-interes"></div>
+            <div class="total-label">Cuota mensual</div>
+            <div class="total-value" id="total-banco-mensual"></div>
           </div>
         </div>
 
@@ -349,19 +364,26 @@
           <div class="form-row">
             <input id="banco-fecha" type="date" />
             <select id="banco-tipo">
-              <option value="cuota">Reducción de cuota</option>
-              <option value="plazo">Reducción de plazo</option>
+              <option value="reduccion_cuota">Reducción de Cuota</option>
+              <option value="reduccion_plazo">Reducción de Plazo</option>
               <option value="cuota_mensual">Pago de Cuota Mensual</option>
+              <option value="otros">Otros</option>
             </select>
             <input id="banco-monto" type="number" placeholder="Monto pagado (S/)" />
           </div>
           <div class="form-row">
             <input id="banco-capital" type="number" placeholder="Monto a capital (opcional)" />
-            <input id="banco-nota" placeholder="Nota (opcional)" />
+            <div class="field-col">
+              <label class="field-label">N° de Operación (opcional)</label>
+              <input id="banco-num-operacion" type="text" placeholder="Ej. 000123456" />
+            </div>
             <div class="field-col">
               <label class="field-label">Constancia (foto, opcional)</label>
               <input id="banco-imagen" type="file" accept="image/*,application/pdf" />
             </div>
+          </div>
+          <div class="form-row">
+            <input id="banco-nota" placeholder="Nota (opcional)" style="grid-column:1/-1" />
           </div>
           <button class="add-btn" id="banco-add-btn">Agregar pago</button>
           <button class="cambiar-rol" id="banco-cancelar-edicion" hidden style="margin-top:4px;">Cancelar edición</button>
@@ -372,6 +394,7 @@
           <input id="filtro-banco-desde" type="date" title="Desde" />
           <input id="filtro-banco-hasta" type="date" title="Hasta" />
           <input id="filtro-banco-numero" type="text" placeholder="N° registro" inputmode="numeric" />
+          <input id="filtro-banco-num-op" type="text" placeholder="N° de Operación" />
           <select id="filtro-banco-orden">
             <option value="fecha_desc">Fecha: más reciente</option>
             <option value="fecha_asc">Fecha: más antigua</option>
@@ -415,20 +438,17 @@ import {
   getStorage, ref, uploadBytes, getDownloadURL
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
-// Usuarios con su propia clave individual. hermanoIdx debe coincidir con
-// la posición de su nombre dentro de config.hermanos (0, 1, 2...).
+// Nombres de las 3 "tarjetas de aportante" en Aportes (los 2 hermanos + Gustavo,
+// que también aporta). El orden define el hermanoIdx de cada uno (0, 1, 2).
+const NOMBRES_HERMANOS = ["Cristian Reyna", "Marlon Reyna", "Gustavo Reyna"];
+const IDX_ADMIN_APORTANTE = NOMBRES_HERMANOS.length - 1;
+
+// Usuarios con su propia clave individual.
 const USUARIOS = [
   { nombre: "Cristian Reyna", clave: "73427943", tipo: "hermano", hermanoIdx: 0 },
   { nombre: "Marlon Reyna", clave: "45967179", tipo: "hermano", hermanoIdx: 1 },
   { nombre: "Gustavo Reyna", clave: "47105956", tipo: "encargado" },
 ];
-// Nombres de hermanos + el administrador (para que también pueda
-// registrarse a sí mismo como aportante en el combo del formulario).
-const NOMBRES_HERMANOS = USUARIOS.filter((u) => u.tipo === "hermano")
-  .sort((a, b) => a.hermanoIdx - b.hermanoIdx)
-  .map((u) => u.nombre)
-  .concat(USUARIOS.filter((u) => u.tipo === "encargado").map((u) => u.nombre));
-const IDX_ADMIN_APORTANTE = NOMBRES_HERMANOS.length - 1;
 
 // El nombre del usuario actual SIEMPRE se resuelve desde USUARIOS (no desde
 // lo guardado en el navegador), así que si cambias un nombre en el código,
@@ -443,19 +463,26 @@ function nombreActual() {
 // para que el login nunca dependa de que Firebase esté bien configurado.
 let db, storage;
 
-const MOTIVOS = {
-  reduccion_cuota: { label: "Reducción de cuota", color: "#8A5A2B" },
-  reduccion_plazo: { label: "Reducción de plazo", color: "#3D6B54" },
-  cuota_mensual: { label: "Cuota mensual", color: "#3A6EA5" },
+// Un solo diccionario para "Motivo" (Aportes) y "Tipo" (Banco) — así los dos
+// combos siempre muestran exactamente las mismas 4 opciones.
+const CATEGORIAS = {
+  reduccion_cuota: { label: "Reducción de Cuota", color: "#8A5A2B" },
+  reduccion_plazo: { label: "Reducción de Plazo", color: "#3D6B54" },
+  cuota_mensual: { label: "Pago de Cuota Mensual", color: "#3A6EA5" },
   otros: { label: "Otros", color: "#6B6459" },
-  // Alias para registros guardados antes de este cambio (esquema anterior)
-  prepago: { label: "Reducción de cuota", color: "#8A5A2B" },
-  cuota: { label: "Cuota mensual", color: "#3A6EA5" },
+  // Alias para registros guardados antes de este cambio (esquemas anteriores)
+  prepago: { label: "Reducción de Cuota", color: "#8A5A2B" },
+  cuota: { label: "Reducción de Cuota", color: "#8A5A2B" },
+  plazo: { label: "Reducción de Plazo", color: "#3D6B54" },
 };
+const MOTIVOS = CATEGORIAS;
+const TIPOS = CATEGORIAS;
 const MEDIOS = {
   yape: "Yape",
   plin: "Plin",
   efectivo: "Efectivo",
+  transferencia: "Transferencia bancaria",
+  otro: "Otro",
 };
 
 // Sube la imagen a Storage con un nombre automático y devuelve su URL pública
@@ -494,9 +521,10 @@ let pagosBanco = [];
 let editingConfig = false;
 let rol = null; // { tipo: "hermano", hermanoIdx: 0 } | { tipo: "encargado" }
 const PAGE_SIZE = 10;
-let yapesFiltro = { estado: "todos", hermano: "todos", desde: "", hasta: "", numero: "", orden: "fecha_desc" };
+let yapesFiltro = { estado: "todos", hermano: "todos", desde: "", hasta: "", numero: "", numOp: "", orden: "fecha_desc" };
 let yapesPagina = 1;
-let bancoFiltro = { desde: "", hasta: "", numero: "", orden: "fecha_desc" };
+let vistaAdminAportes = "todos"; // "todos" | "gustavo" — cuál de las 2 pestañas de Aportes está activa
+let bancoFiltro = { desde: "", hasta: "", numero: "", numOp: "", orden: "fecha_desc" };
 let bancoPagina = 1;
 
 function cargarRol() {
@@ -514,11 +542,14 @@ function guardarRol(nuevoRol, persistir) {
 function aplicarRol() {
   const esHermano = rol && rol.tipo === "hermano";
   document.getElementById("tab-btn-banco").hidden = esHermano;
+  document.getElementById("tab-btn-yapes-gustavo").hidden = esHermano;
   document.getElementById("edit-config-btn").hidden = esHermano;
   document.getElementById("header-title").textContent = esHermano
     ? `Cuenta: ${nombreActual()}`
     : `Administrador: ${nombreActual()}`;
+  document.getElementById("tab-btn-yapes").textContent = esHermano ? "📱 Mis Aportes" : "📊 Todos los Aportes";
   if (esHermano) {
+    vistaAdminAportes = "todos";
     document.getElementById("tab-yapes").hidden = false;
     document.getElementById("tab-banco").hidden = true;
     document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
@@ -579,14 +610,18 @@ function pintarLoginStep1() {
   USUARIOS.forEach((u) => {
     const b = document.createElement("button");
     b.className = "whoami-btn" + (u.tipo === "encargado" ? " encargado" : "");
-    b.textContent = u.nombre;
+    b.textContent = u.loginLabel || u.nombre;
     b.addEventListener("click", () => {
       usuarioSeleccionado = u;
-      document.getElementById("login-nombre-elegido").textContent = u.nombre;
+      document.getElementById("login-nombre-elegido").textContent = u.loginLabel || u.nombre;
       document.getElementById("login-step1").hidden = true;
       document.getElementById("login-step2").hidden = false;
       document.getElementById("login-error").style.display = "none";
       document.getElementById("login-clave").value = "";
+      // El Administrador nunca puede "recordar sesión": siempre debe pedir
+      // login para que nadie más vea todos los datos desde este dispositivo.
+      document.getElementById("login-recordar-label").hidden = u.tipo === "encargado";
+      document.getElementById("login-recordar").checked = false;
       document.getElementById("login-clave").focus();
     });
     box.appendChild(b);
@@ -603,6 +638,16 @@ document.getElementById("login-volver-btn").addEventListener("click", () => {
 document.getElementById("login-btn").addEventListener("click", tryLogin);
 document.getElementById("login-clave").addEventListener("keydown", (e) => { if (e.key === "Enter") tryLogin(); });
 
+// Evita que la tecla Enter dispare sin querer el registro de un pago mientras
+// se escribe en cualquier campo del formulario (solo el login usa Enter).
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Enter") return;
+  const el = e.target;
+  if (!el || !el.matches("input, select")) return;
+  if (el.id === "login-clave") return;
+  e.preventDefault();
+});
+
 function tryLogin() {
   if (!usuarioSeleccionado) return;
   const val = document.getElementById("login-clave").value;
@@ -610,7 +655,7 @@ function tryLogin() {
     const nuevoRol = usuarioSeleccionado.tipo === "hermano"
       ? { tipo: "hermano", hermanoIdx: usuarioSeleccionado.hermanoIdx }
       : { tipo: "encargado" };
-    const recordar = document.getElementById("login-recordar").checked;
+    const recordar = usuarioSeleccionado.tipo === "encargado" ? false : document.getElementById("login-recordar").checked;
     guardarRol(nuevoRol, recordar);
     document.getElementById("login").hidden = true;
     document.getElementById("loading").hidden = false;
@@ -710,8 +755,12 @@ document.querySelectorAll(".tab-btn").forEach((btn) => {
   btn.addEventListener("click", () => {
     document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
     btn.classList.add("active");
-    document.getElementById("tab-yapes").hidden = btn.dataset.tab !== "yapes";
-    document.getElementById("tab-banco").hidden = btn.dataset.tab !== "banco";
+    const tab = btn.dataset.tab; // "yapes" | "yapes-gustavo" | "banco"
+    document.getElementById("tab-yapes").hidden = !(tab === "yapes" || tab === "yapes-gustavo");
+    document.getElementById("tab-banco").hidden = tab !== "banco";
+    vistaAdminAportes = tab === "yapes-gustavo" ? "gustavo" : "todos";
+    yapesPagina = 1;
+    renderAll();
   });
 });
 
@@ -739,6 +788,7 @@ function editarYape(id) {
   document.getElementById("yape-medio").value = y.medioPago || "yape";
   document.getElementById("yape-monto").value = y.monto;
   document.getElementById("yape-fecha-pago").value = y.fechaPago;
+  document.getElementById("yape-num-operacion").value = y.numeroOperacion || "";
   document.getElementById("yape-nota").value = y.nota || "";
   const sel = document.getElementById("yape-hermano");
   if (sel) sel.value = y.hermano;
@@ -751,6 +801,7 @@ function editarYape(id) {
 document.getElementById("yape-cancelar-edicion").addEventListener("click", () => {
   yapeEditId = null;
   document.getElementById("yape-monto").value = "";
+  document.getElementById("yape-num-operacion").value = "";
   document.getElementById("yape-nota").value = "";
   document.getElementById("yape-imagen").value = "";
   document.getElementById("yape-add-btn").textContent = "Registrar pago";
@@ -785,6 +836,7 @@ document.getElementById("yape-add-btn").addEventListener("click", async () => {
       medioPago: document.getElementById("yape-medio").value,
       motivo: document.getElementById("yape-motivo").value,
       fechaPago,
+      numeroOperacion: document.getElementById("yape-num-operacion").value.trim(),
       monto,
       nota: document.getElementById("yape-nota").value.trim(),
       imagenUrl,
@@ -799,6 +851,7 @@ document.getElementById("yape-add-btn").addEventListener("click", async () => {
       await addDoc(collection(db, "yapes"), { ...datos, numero, fechaRegistro: new Date().toISOString(), estado: "pendiente" });
     }
     document.getElementById("yape-monto").value = "";
+    document.getElementById("yape-num-operacion").value = "";
     document.getElementById("yape-nota").value = "";
     fileInput.value = "";
   } catch (e) {
@@ -817,9 +870,10 @@ function editarBanco(id) {
   if (!p) return;
   bancoEditId = id;
   document.getElementById("banco-fecha").value = p.fecha;
-  document.getElementById("banco-tipo").value = p.tipo;
+  document.getElementById("banco-tipo").value = p.tipo === "cuota" ? "reduccion_cuota" : (p.tipo === "plazo" ? "reduccion_plazo" : p.tipo);
   document.getElementById("banco-monto").value = p.monto;
   document.getElementById("banco-capital").value = p.montoCapital ?? "";
+  document.getElementById("banco-num-operacion").value = p.numeroOperacion || "";
   document.getElementById("banco-nota").value = p.nota || "";
   const btn = document.getElementById("banco-add-btn");
   btn.textContent = "Guardar cambios";
@@ -831,6 +885,7 @@ document.getElementById("banco-cancelar-edicion").addEventListener("click", () =
   bancoEditId = null;
   document.getElementById("banco-monto").value = "";
   document.getElementById("banco-capital").value = "";
+  document.getElementById("banco-num-operacion").value = "";
   document.getElementById("banco-nota").value = "";
   document.getElementById("banco-imagen").value = "";
   document.getElementById("banco-add-btn").textContent = "Agregar pago";
@@ -865,6 +920,7 @@ document.getElementById("banco-add-btn").addEventListener("click", async () => {
       monto,
       tipo: document.getElementById("banco-tipo").value,
       montoCapital: capitalVal ? Number(capitalVal) : null,
+      numeroOperacion: document.getElementById("banco-num-operacion").value.trim(),
       nota: document.getElementById("banco-nota").value.trim(),
       imagenUrl,
       imagenNombre,
@@ -879,6 +935,7 @@ document.getElementById("banco-add-btn").addEventListener("click", async () => {
     }
     document.getElementById("banco-monto").value = "";
     document.getElementById("banco-capital").value = "";
+    document.getElementById("banco-num-operacion").value = "";
     document.getElementById("banco-nota").value = "";
     fileInput.value = "";
   } catch (e) {
@@ -906,6 +963,11 @@ document.getElementById("filtro-yape-numero").addEventListener("input", () => {
   yapesPagina = 1;
   renderAll();
 });
+document.getElementById("filtro-yape-num-op").addEventListener("input", () => {
+  yapesFiltro.numOp = document.getElementById("filtro-yape-num-op").value.trim().toLowerCase();
+  yapesPagina = 1;
+  renderAll();
+});
 document.getElementById("yapes-pag-prev").addEventListener("click", () => { yapesPagina = Math.max(1, yapesPagina - 1); renderAll(); });
 document.getElementById("yapes-pag-next").addEventListener("click", () => { yapesPagina += 1; renderAll(); });
 
@@ -920,6 +982,11 @@ document.getElementById("yapes-pag-next").addEventListener("click", () => { yape
 });
 document.getElementById("filtro-banco-numero").addEventListener("input", () => {
   bancoFiltro.numero = document.getElementById("filtro-banco-numero").value.trim();
+  bancoPagina = 1;
+  renderAll();
+});
+document.getElementById("filtro-banco-num-op").addEventListener("input", () => {
+  bancoFiltro.numOp = document.getElementById("filtro-banco-num-op").value.trim().toLowerCase();
   bancoPagina = 1;
   renderAll();
 });
@@ -963,7 +1030,9 @@ function renderAll() {
   const maxTotal = Math.max(1, ...totalesPorHermano);
   const grid = document.getElementById("hermanos-grid");
   grid.innerHTML = "";
-  const indicesAMostrar = rol.tipo === "hermano" ? [rol.hermanoIdx] : NOMBRES_HERMANOS.map((_, i) => i);
+  const indicesAMostrar = rol.tipo === "hermano"
+    ? [rol.hermanoIdx]
+    : (vistaAdminAportes === "gustavo" ? [IDX_ADMIN_APORTANTE] : NOMBRES_HERMANOS.map((_, i) => i));
   indicesAMostrar.forEach((idx) => {
     const nombre = NOMBRES_HERMANOS[idx];
     const card = document.createElement("div");
@@ -974,12 +1043,7 @@ function renderAll() {
     monto.textContent = formatSoles(totalesPorHermano[idx]);
     const desglose = document.createElement("div");
     desglose.className = "hermano-desglose";
-    let textoDesglose = `Cuota ${formatSoles(desglosePorHermano[idx].cuota)} · Plazo ${formatSoles(desglosePorHermano[idx].plazo)} · Mensual ${formatSoles(desglosePorHermano[idx].mensual)}`;
-    if (idx === IDX_ADMIN_APORTANTE && rol.tipo !== "hermano") {
-      const totalBancoCard = pagosBanco.reduce((s, p) => s + p.monto, 0);
-      textoDesglose += ` · Directo al banco ${formatSoles(totalBancoCard)}`;
-    }
-    desglose.textContent = textoDesglose;
+    desglose.textContent = `Cuota ${formatSoles(desglosePorHermano[idx].cuota)} · Plazo ${formatSoles(desglosePorHermano[idx].plazo)} · Mensual ${formatSoles(desglosePorHermano[idx].mensual)}`;
     const track = document.createElement("div");
     track.className = "bar-track";
     track.innerHTML = `<div class="bar-fill" style="width:${(totalesPorHermano[idx] / maxTotal) * 100}%"></div>`;
@@ -1015,26 +1079,33 @@ function renderAll() {
   document.getElementById("total-motivo-plazo").textContent = formatSoles(totalReducPlazo);
   document.getElementById("total-motivo-mensual").textContent = formatSoles(totalMensual);
 
-  // filtro por hermano (poblado dinámicamente, oculto si el rol es hermano)
+  // filtro por hermano (poblado dinámicamente, oculto si el rol es hermano o si
+  // estamos en la pestaña "Aportes Gustavo Reyna", donde ya se sabe quién es)
   const selFiltroHermano = document.getElementById("filtro-yape-hermano");
-  const colFiltroHermano = selFiltroHermano;
-  if (rol.tipo === "hermano") {
-    colFiltroHermano.style.display = "none";
+  if (rol.tipo === "hermano" || vistaAdminAportes === "gustavo") {
+    selFiltroHermano.style.display = "none";
   } else {
-    colFiltroHermano.style.display = "";
+    selFiltroHermano.style.display = "";
     const prevF = selFiltroHermano.value || "todos";
     selFiltroHermano.innerHTML = `<option value="todos">Todas las personas</option>` +
       NOMBRES_HERMANOS.map((n, idx) => `<option value="${idx}">${escapeHtml(n)}</option>`).join("");
     selFiltroHermano.value = prevF;
   }
 
+  // hermano efectivo a filtrar: propio (si es hermano), Gustavo (si es esa
+  // pestaña), o lo que diga el filtro manual (si está en "Todos")
+  const hermanoFiltroEfectivo = rol.tipo === "hermano" ? String(rol.hermanoIdx)
+    : vistaAdminAportes === "gustavo" ? String(IDX_ADMIN_APORTANTE)
+    : yapesFiltro.hermano;
+
   // yapes ledger: aplicar filtros
   let yapesFiltrados = yapes.filter((y) => {
     if (yapesFiltro.estado !== "todos" && y.estado !== yapesFiltro.estado) return false;
-    if (rol.tipo !== "hermano" && yapesFiltro.hermano !== "todos" && String(y.hermano) !== yapesFiltro.hermano) return false;
+    if (hermanoFiltroEfectivo !== "todos" && String(y.hermano) !== hermanoFiltroEfectivo) return false;
     if (yapesFiltro.desde && y.fechaPago < yapesFiltro.desde) return false;
     if (yapesFiltro.hasta && y.fechaPago > yapesFiltro.hasta) return false;
     if (yapesFiltro.numero && !String(y.numero || "").includes(yapesFiltro.numero.replace(/^0+/, ""))) return false;
+    if (yapesFiltro.numOp && !String(y.numeroOperacion || "").toLowerCase().includes(yapesFiltro.numOp)) return false;
     return true;
   });
   yapesFiltrados = ordenarPor(yapesFiltrados, yapesFiltro.orden);
@@ -1070,6 +1141,7 @@ function renderAll() {
           <div class="ledger-hermano">${escapeHtml(rol.tipo === "hermano" ? nombreActual() : (NOMBRES_HERMANOS[y.hermano] || "—"))}</div>
           <span class="motivo-tag" style="color:${m.color};border-color:${m.color}">${m.label}</span>
           ${medio ? `<span class="medio-tag">${medio}</span>` : ""}
+          ${y.numeroOperacion ? `<span class="ledger-numero">Op. ${escapeHtml(y.numeroOperacion)}</span>` : ""}
           ${y.nota ? `<span class="nota">${escapeHtml(y.nota)}</span>` : ""}
           ${mostrarRegistro ? `<span class="ledger-registro">Registrado el ${formatFecha(fechaReg)}</span>` : ""}
         </div>
@@ -1094,13 +1166,16 @@ function renderAll() {
   document.getElementById("total-banco").textContent = formatSoles(totalBanco);
   document.getElementById("total-capital").textContent = formatSoles(totalCapital);
   document.getElementById("total-interes").textContent = formatSoles(totalInteres);
+  document.getElementById("total-banco-cuota").textContent = formatSoles(pagosBanco.filter((p) => p.tipo === "reduccion_cuota" || p.tipo === "cuota").reduce((s, p) => s + p.monto, 0));
+  document.getElementById("total-banco-plazo").textContent = formatSoles(pagosBanco.filter((p) => p.tipo === "reduccion_plazo" || p.tipo === "plazo").reduce((s, p) => s + p.monto, 0));
+  document.getElementById("total-banco-mensual").textContent = formatSoles(pagosBanco.filter((p) => p.tipo === "cuota_mensual").reduce((s, p) => s + p.monto, 0));
 
   // banco ledger: aplicar filtros
-  const TIPOS = { cuota: { label: "Cuota", color: "#8A5A2B" }, plazo: { label: "Plazo", color: "#3D6B54" }, cuota_mensual: { label: "Cuota mensual", color: "#3A6EA5" } };
   let bancoFiltrado = pagosBanco.filter((p) => {
     if (bancoFiltro.desde && p.fecha < bancoFiltro.desde) return false;
     if (bancoFiltro.hasta && p.fecha > bancoFiltro.hasta) return false;
     if (bancoFiltro.numero && !String(p.numero || "").includes(bancoFiltro.numero.replace(/^0+/, ""))) return false;
+    if (bancoFiltro.numOp && !String(p.numeroOperacion || "").toLowerCase().includes(bancoFiltro.numOp)) return false;
     return true;
   });
   bancoFiltrado = ordenarPor(bancoFiltrado, bancoFiltro.orden);
@@ -1131,6 +1206,7 @@ function renderAll() {
         </div>
         <div class="ledger-mid">
           <span class="tipo-tag" style="color:${t.color};border-color:${t.color}">${t.label}</span>
+          ${p.numeroOperacion ? `<span class="ledger-numero">Op. ${escapeHtml(p.numeroOperacion)}</span>` : ""}
           ${p.nota ? `<span class="nota">${escapeHtml(p.nota)}</span>` : ""}
         </div>
         <div class="ledger-actions">
