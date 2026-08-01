@@ -1067,12 +1067,19 @@ function renderAll() {
     selEl.value = prevVal || String(IDX_ADMIN_APORTANTE);
   }
 
-  // totals yapes
-  const verificado = yapes.filter((y) => y.estado === "verificado").reduce((s, y) => s + y.monto, 0);
-  const pendiente = yapes.filter((y) => y.estado === "pendiente").reduce((s, y) => s + y.monto, 0);
-  const totalReducCuota = yapes.filter((y) => y.motivo === "reduccion_cuota" || y.motivo === "prepago").reduce((s, y) => s + y.monto, 0);
-  const totalReducPlazo = yapes.filter((y) => y.motivo === "reduccion_plazo").reduce((s, y) => s + y.monto, 0);
-  const totalMensual = yapes.filter((y) => y.motivo === "cuota_mensual" || y.motivo === "cuota").reduce((s, y) => s + y.monto, 0);
+  // hermano efectivo a filtrar: propio (si es hermano), Gustavo (si es esa
+  // pestaña "Aportes Gustavo Reyna"), o lo que diga el filtro manual (pestaña "Todos")
+  const hermanoFiltroEfectivo = rol.tipo === "hermano" ? String(rol.hermanoIdx)
+    : vistaAdminAportes === "gustavo" ? String(IDX_ADMIN_APORTANTE)
+    : yapesFiltro.hermano;
+
+  // totals yapes — respetan la pestaña activa (Todos / solo Gustavo / solo el hermano)
+  const yapesParaTotales = hermanoFiltroEfectivo === "todos" ? yapes : yapes.filter((y) => String(y.hermano) === hermanoFiltroEfectivo);
+  const verificado = yapesParaTotales.filter((y) => y.estado === "verificado").reduce((s, y) => s + y.monto, 0);
+  const pendiente = yapesParaTotales.filter((y) => y.estado === "pendiente").reduce((s, y) => s + y.monto, 0);
+  const totalReducCuota = yapesParaTotales.filter((y) => y.motivo === "reduccion_cuota" || y.motivo === "prepago").reduce((s, y) => s + y.monto, 0);
+  const totalReducPlazo = yapesParaTotales.filter((y) => y.motivo === "reduccion_plazo").reduce((s, y) => s + y.monto, 0);
+  const totalMensual = yapesParaTotales.filter((y) => y.motivo === "cuota_mensual" || y.motivo === "cuota").reduce((s, y) => s + y.monto, 0);
   document.getElementById("total-verificado").textContent = formatSoles(verificado);
   document.getElementById("total-pendiente").textContent = formatSoles(pendiente);
   document.getElementById("total-motivo-cuota").textContent = formatSoles(totalReducCuota);
@@ -1091,12 +1098,6 @@ function renderAll() {
       NOMBRES_HERMANOS.map((n, idx) => `<option value="${idx}">${escapeHtml(n)}</option>`).join("");
     selFiltroHermano.value = prevF;
   }
-
-  // hermano efectivo a filtrar: propio (si es hermano), Gustavo (si es esa
-  // pestaña), o lo que diga el filtro manual (si está en "Todos")
-  const hermanoFiltroEfectivo = rol.tipo === "hermano" ? String(rol.hermanoIdx)
-    : vistaAdminAportes === "gustavo" ? String(IDX_ADMIN_APORTANTE)
-    : yapesFiltro.hermano;
 
   // yapes ledger: aplicar filtros
   let yapesFiltrados = yapes.filter((y) => {
