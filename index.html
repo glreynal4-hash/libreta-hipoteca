@@ -4,6 +4,14 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Libreta Hipoteca — 3 hermanos</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#16233D">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Libreta">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Roboto+Slab:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -120,6 +128,12 @@
   .ledger-numero{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);}
   .view-btn{background:transparent;border:1px solid var(--brass);color:var(--brass);border-radius:6px;
     cursor:pointer;padding:4px 7px;flex-shrink:0;font-size:13px;text-decoration:none;display:inline-flex;}
+  .aviso-pendientes{display:flex;align-items:center;gap:8px;background:#FCF3E3;border:1px solid #E8C98A;
+    color:#7A5A1E;font-size:13px;font-weight:600;padding:9px 14px;border-radius:7px;margin:0 0 16px;cursor:pointer;}
+  .aviso-pendientes:hover{background:#FAEBCB;}
+  .export-btn{background:transparent;border:1px solid var(--brass);color:var(--brass);border-radius:6px;
+    font-family:'IBM Plex Mono',monospace;font-size:11px;padding:5px 10px;cursor:pointer;}
+  .export-btn:hover{background:var(--brass);color:#fff;}
   .modal-overlay{position:fixed;inset:0;background:rgba(22,35,61,.45);display:flex;align-items:center;
     justify-content:center;z-index:1000;padding:20px;}
   .modal-box{background:var(--paper);border-radius:10px;padding:22px;max-width:340px;width:100%;
@@ -224,6 +238,11 @@
         <button class="edit-btn" id="edit-config-btn">Editar</button>
       </div>
 
+      <div id="aviso-pendientes" class="aviso-pendientes" hidden></div>
+
+      <div class="section-label" id="chart-label" hidden>📉 PROGRESO DE LA CUOTA</div>
+      <div id="chart-cuota-container" hidden style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px 14px 4px;margin-bottom:16px;"></div>
+
       <div class="tabs" id="tabs-row">
         <button class="tab-btn active" data-tab="yapes" id="tab-btn-yapes">📊 Todos los Aportes</button>
         <span id="tabs-dinamicas" style="display:inline-flex;gap:6px;flex-wrap:wrap;"></span>
@@ -310,7 +329,10 @@
           <button class="cambiar-rol" id="yape-cancelar-edicion" hidden style="margin-top:4px;">Cancelar edición</button>
         </div>
 
-        <div class="section-label">📅 HISTORIAL DE PAGOS</div>
+        <div class="section-label" style="display:flex;justify-content:space-between;align-items:center;">
+          <span>📅 HISTORIAL DE PAGOS</span>
+          <button class="export-btn" id="export-yapes-btn">⬇ Exportar a CSV</button>
+        </div>
         <div class="filtros-row">
           <select id="filtro-yape-estado">
             <option value="todos">Todos los estados</option>
@@ -394,7 +416,10 @@
           <button class="cambiar-rol" id="banco-cancelar-edicion" hidden style="margin-top:4px;">Cancelar edición</button>
         </div>
 
-        <div class="section-label">📅 HISTORIAL DE PAGOS AL BANCO</div>
+        <div class="section-label" style="display:flex;justify-content:space-between;align-items:center;">
+          <span>📅 HISTORIAL DE PAGOS AL BANCO</span>
+          <button class="export-btn" id="export-banco-btn">⬇ Exportar a CSV</button>
+        </div>
         <div class="filtros-row">
           <input id="filtro-banco-desde" type="date" title="Desde" />
           <input id="filtro-banco-hasta" type="date" title="Hasta" />
@@ -530,6 +555,9 @@ let yapesFiltro = { estado: "todos", hermano: "todos", desde: "", hasta: "", num
 let yapesPagina = 1;
 let vistaAdminAportes = "todos"; // "todos" | "0" | "1" | "2"... (índice de la persona cuya pestaña está activa)
 let tabsAbiertas = []; // índices de personas con una pestaña dinámica abierta
+let ultimosYapesFiltrados = [];
+let ultimoBancoFiltrado = [];
+let historialCuota = [];
 let bancoFiltro = { desde: "", hasta: "", numero: "", numOp: "", orden: "fecha_desc" };
 let bancoPagina = 1;
 
@@ -723,6 +751,11 @@ async function initApp() {
     if (snap.exists()) { config = { ...DEFAULT_CONFIG, ...snap.data() }; renderAll(); }
   });
 
+  onSnapshot(query(collection(db, "historialCuota"), orderBy("fecha", "asc")), (snap) => {
+    historialCuota = snap.docs.map((d) => d.data());
+    renderAll();
+  }, () => {});
+
   // Si es un hermano, la consulta a Firestore trae SOLO sus propios registros
   // (filtrado en el servidor, no solo escondido en la pantalla). El orden se
   // hace en el navegador para no depender de crear un índice en Firebase.
@@ -836,8 +869,14 @@ document.getElementById("edit-config-btn").addEventListener("click", async () =>
   if (!editingConfig) {
     const nuevoInicial = Number(document.getElementById("cuota-inicial-edit").value) || config.cuotaInicial;
     const nuevoActual = Number(document.getElementById("cuota-actual-edit").value) || config.cuotaActual;
+    const cambioCuota = nuevoActual !== config.cuotaActual;
     config = { ...config, cuotaInicial: nuevoInicial, cuotaActual: nuevoActual };
-    try { await setDoc(doc(db, "config", "main"), config); }
+    try {
+      await setDoc(doc(db, "config", "main"), config);
+      if (cambioCuota) {
+        await addDoc(collection(db, "historialCuota"), { fecha: new Date().toISOString().slice(0, 10), valor: nuevoActual });
+      }
+    }
     catch (e) { showError("No se pudo guardar la configuración."); }
   }
   renderAll();
@@ -1071,6 +1110,36 @@ function ordenarPor(lista, orden) {
   });
   return arr;
 }
+// Dibuja un gráfico simple (SVG, sin librerías) con el progreso de la cuota
+function dibujarGraficoCuota() {
+  const label = document.getElementById("chart-label");
+  const cont = document.getElementById("chart-cuota-container");
+  if (historialCuota.length === 0) { label.hidden = true; cont.hidden = true; return; }
+  label.hidden = false;
+  cont.hidden = false;
+
+  const puntos = [{ fecha: null, valor: config.cuotaInicial }, ...historialCuota];
+  const w = 620, h = 170, padL = 8, padR = 8, padT = 26, padB = 26;
+  const valores = puntos.map((p) => p.valor);
+  const max = Math.max(...valores), min = Math.min(...valores);
+  const rango = Math.max(1, max - min);
+  const stepX = puntos.length > 1 ? (w - padL - padR) / (puntos.length - 1) : 0;
+  const coords = puntos.map((p, i) => ({
+    x: padL + i * stepX,
+    y: padT + (1 - (p.valor - min) / rango) * (h - padT - padB),
+    ...p,
+  }));
+  const path = coords.map((c, i) => (i === 0 ? "M" : "L") + c.x.toFixed(1) + "," + c.y.toFixed(1)).join(" ");
+  const puntosSvg = coords.map((c) => `<circle cx="${c.x.toFixed(1)}" cy="${c.y.toFixed(1)}" r="4" fill="#8A5A2B"/>`).join("");
+  const valoresSvg = coords.map((c) => `<text x="${c.x.toFixed(1)}" y="${(c.y - 10).toFixed(1)}" font-size="11" fill="#16233D" text-anchor="middle" font-weight="600" font-family="'IBM Plex Mono', monospace">S/${c.valor}</text>`).join("");
+  const fechasSvg = coords.map((c) => `<text x="${c.x.toFixed(1)}" y="${h - 6}" font-size="10" fill="#8A7C68" text-anchor="middle" font-family="'IBM Plex Mono', monospace">${c.fecha ? formatFecha(c.fecha) : "Inicio"}</text>`).join("");
+
+  cont.innerHTML = `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto;display:block;">
+    <path d="${path}" fill="none" stroke="#8A5A2B" stroke-width="2.5"/>
+    ${puntosSvg}${valoresSvg}${fechasSvg}
+  </svg>`;
+}
+
 function renderAll() {
   // cuota card
   document.getElementById("cuota-inicial-view").hidden = editingConfig;
@@ -1159,6 +1228,32 @@ function renderAll() {
   document.getElementById("total-motivo-plazo").textContent = formatSoles(totalReducPlazo);
   document.getElementById("total-motivo-mensual").textContent = formatSoles(totalMensual);
 
+  // aviso de pendientes por verificar (cuenta TODO, sin importar la pestaña activa)
+  const pendientesGlobal = (rol.tipo === "hermano" ? yapes.filter((y) => y.hermano === rol.hermanoIdx) : yapes)
+    .filter((y) => y.estado === "pendiente");
+  const avisoEl = document.getElementById("aviso-pendientes");
+  if (pendientesGlobal.length > 0) {
+    const totalPend = pendientesGlobal.reduce((s, y) => s + y.monto, 0);
+    avisoEl.hidden = false;
+    avisoEl.textContent = rol.tipo === "hermano"
+      ? `⏳ Tienes ${pendientesGlobal.length} pago(s) tuyo(s) por verificar (${formatSoles(totalPend)}) — tócalo para verlos`
+      : `⏳ Hay ${pendientesGlobal.length} pago(s) pendiente(s) por verificar (${formatSoles(totalPend)}) — toca para verlos`;
+    avisoEl.onclick = () => {
+      document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
+      document.getElementById("tab-btn-yapes").classList.add("active");
+      document.getElementById("tab-yapes").hidden = false;
+      document.getElementById("tab-banco").hidden = true;
+      vistaAdminAportes = "todos";
+      yapesFiltro.estado = "pendiente";
+      document.getElementById("filtro-yape-estado").value = "pendiente";
+      yapesPagina = 1;
+      renderTabsDinamicas();
+      renderAll();
+    };
+  } else {
+    avisoEl.hidden = true;
+  }
+
   // filtro por hermano (poblado dinámicamente, oculto si el rol es hermano o si
   // hay una pestaña dinámica de una persona específica activa)
   const selFiltroHermano = document.getElementById("filtro-yape-hermano");
@@ -1183,6 +1278,7 @@ function renderAll() {
     return true;
   });
   yapesFiltrados = ordenarPor(yapesFiltrados, yapesFiltro.orden);
+  ultimosYapesFiltrados = yapesFiltrados;
 
   const totalPagYapes = Math.max(1, Math.ceil(yapesFiltrados.length / PAGE_SIZE));
   if (yapesPagina > totalPagYapes) yapesPagina = totalPagYapes;
@@ -1274,6 +1370,7 @@ function renderAll() {
     return true;
   });
   bancoFiltrado = ordenarPor(bancoFiltrado, bancoFiltro.orden);
+  ultimoBancoFiltrado = bancoFiltrado;
 
   const totalPagBanco = Math.max(1, Math.ceil(bancoFiltrado.length / PAGE_SIZE));
   if (bancoPagina > totalPagBanco) bancoPagina = totalPagBanco;
@@ -1313,6 +1410,8 @@ function renderAll() {
       bLedger.appendChild(row);
     });
   }
+
+  dibujarGraficoCuota();
 }
 
 // event delegation for ledger buttons
@@ -1344,10 +1443,66 @@ document.addEventListener("click", async (e) => {
   } catch (err) { showError("No se pudo completar la acción."); }
 });
 
+function escapeCsv(v) {
+  const s = String(v ?? "");
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+function descargarCsv(nombreArchivo, filas) {
+  const csv = filas.map((fila) => fila.map(escapeCsv).join(",")).join("\r\n");
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = nombreArchivo;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+document.getElementById("export-yapes-btn").addEventListener("click", () => {
+  const filas = [["N° registro", "Fecha de pago", "Persona", "Motivo", "Medio de pago", "N° de Operación", "Monto (S/)", "Estado", "Nota"]];
+  ultimosYapesFiltrados.forEach((y) => {
+    filas.push([
+      formatNumero(y.numero),
+      y.fechaPago,
+      rol.tipo === "hermano" ? nombreActual() : (NOMBRES_HERMANOS[y.hermano] || ""),
+      (CATEGORIAS[y.motivo] || {}).label || y.motivo,
+      MEDIOS[y.medioPago] || "",
+      y.numeroOperacion || "",
+      y.monto,
+      y.estado,
+      y.nota || "",
+    ]);
+  });
+  descargarCsv(`aportes_${new Date().toISOString().slice(0, 10)}.csv`, filas);
+});
+document.getElementById("export-banco-btn").addEventListener("click", () => {
+  const filas = [["N° registro", "Fecha", "Tipo", "Monto (S/)", "Monto a capital (S/)", "N° de Operación", "Nota"]];
+  ultimoBancoFiltrado.forEach((p) => {
+    filas.push([
+      formatNumero(p.numero),
+      p.fecha,
+      (CATEGORIAS[p.tipo] || {}).label || p.tipo,
+      p.monto,
+      p.montoCapital ?? "",
+      p.numeroOperacion || "",
+      p.nota || "",
+    ]);
+  });
+  descargarCsv(`pagos_banco_${new Date().toISOString().slice(0, 10)}.csv`, filas);
+});
+
 function escapeHtml(str) {
   const d = document.createElement("div");
   d.textContent = str ?? "";
   return d.innerHTML;
+}
+
+// Registro del service worker (para que se pueda "instalar" como app)
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  });
 }
 </script>
 </body>
