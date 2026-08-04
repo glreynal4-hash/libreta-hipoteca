@@ -184,6 +184,8 @@
   }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js" defer></script>
 </head>
 <body>
 
@@ -310,8 +312,8 @@
             <div class="field-col">
               <label class="field-label">Motivo</label>
               <select id="yape-motivo">
-                <option value="reduccion_cuota">Reducción de Cuota</option>
-                <option value="reduccion_plazo">Reducción de Plazo</option>
+                <option value="reduccion_cuota">Prepago - Reducción de Cuota</option>
+                <option value="reduccion_plazo">Prepago - Reducción de Plazo</option>
                 <option value="cuota_mensual">Pago de Cuota Mensual</option>
                 <option value="otros">Otros</option>
               </select>
@@ -336,7 +338,11 @@
               <label class="field-label">N° de Operación (opcional)</label>
               <input id="yape-num-operacion" type="text" placeholder="Ej. 000123456" />
             </div>
-            <input id="yape-nota" placeholder="Nota (opcional)" style="grid-column:span 2" />
+            <div class="field-col">
+              <label class="field-label">N° Cuota (opcional)</label>
+              <input id="yape-num-cuota" type="text" placeholder="Ej. 61" />
+            </div>
+            <input id="yape-nota" placeholder="Nota (opcional)" />
           </div>
           <button class="add-btn" id="yape-add-btn">Registrar pago</button>
           <button class="cambiar-rol" id="yape-cancelar-edicion" hidden style="margin-top:4px;">Cancelar edición</button>
@@ -404,8 +410,8 @@
           <div class="form-row">
             <input id="banco-fecha" type="date" />
             <select id="banco-tipo">
-              <option value="reduccion_cuota">Reducción de Cuota</option>
-              <option value="reduccion_plazo">Reducción de Plazo</option>
+              <option value="reduccion_cuota">Prepago - Reducción de Cuota</option>
+              <option value="reduccion_plazo">Prepago - Reducción de Plazo</option>
               <option value="cuota_mensual">Pago de Cuota Mensual</option>
               <option value="otros">Otros</option>
             </select>
@@ -420,14 +426,20 @@
             <div class="field-col">
               <label class="field-label">Constancia 1 (foto, opcional)</label>
               <input id="banco-imagen" type="file" accept="image/*,application/pdf" />
+              <span id="banco-imagen-hint" style="font-size:11px;color:#3D6B54;"></span>
             </div>
           </div>
           <div class="form-row">
             <div class="field-col">
               <label class="field-label">Constancia 2 (foto, opcional)</label>
               <input id="banco-imagen2" type="file" accept="image/*,application/pdf" />
+              <span id="banco-imagen2-hint" style="font-size:11px;color:#3D6B54;"></span>
             </div>
-            <input id="banco-nota" placeholder="Nota (opcional)" style="grid-column:span 2" />
+            <div class="field-col">
+              <label class="field-label">N° Cuota (opcional)</label>
+              <input id="banco-num-cuota" type="text" placeholder="Ej. 61" />
+            </div>
+            <input id="banco-nota" placeholder="Nota (opcional)" />
           </div>
           <button class="add-btn" id="banco-add-btn">Agregar pago</button>
           <button class="cambiar-rol" id="banco-cancelar-edicion" hidden style="margin-top:4px;">Cancelar edición</button>
@@ -466,10 +478,13 @@
 
         <!-- LISTADO GENERAL -->
         <div id="subtab-listado">
-          <div class="filtros-row">
-            <select id="reporte-mes"></select>
-            <select id="reporte-anio"></select>
-            <select id="reporte-persona"></select>
+          <div class="filtros-row" style="justify-content:space-between;">
+            <div style="display:flex;flex-wrap:wrap;gap:6px;">
+              <select id="reporte-mes"></select>
+              <select id="reporte-anio"></select>
+              <select id="reporte-persona"></select>
+            </div>
+            <button class="export-btn" id="reporte-pdf-btn">📄 Descargar PDF</button>
           </div>
           <div id="reporte-listado-tabla" style="overflow-x:auto;"></div>
         </div>
@@ -512,7 +527,7 @@ import {
   onSnapshot, setDoc, getDoc, query, orderBy, where, runTransaction
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import {
-  getStorage, ref, uploadBytes, getDownloadURL
+  getStorage, ref, uploadBytes, getDownloadURL, deleteObject
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
 // Nombres de las 3 "tarjetas de aportante" en Aportes (los 2 hermanos + Gustavo,
@@ -543,14 +558,14 @@ let db, storage;
 // Un solo diccionario para "Motivo" (Aportes) y "Tipo" (Banco) — así los dos
 // combos siempre muestran exactamente las mismas 4 opciones.
 const CATEGORIAS = {
-  reduccion_cuota: { label: "Reducción de Cuota", color: "#8A5A2B" },
-  reduccion_plazo: { label: "Reducción de Plazo", color: "#3D6B54" },
+  reduccion_cuota: { label: "Prepago - Reducción de Cuota", color: "#8A5A2B" },
+  reduccion_plazo: { label: "Prepago - Reducción de Plazo", color: "#3D6B54" },
   cuota_mensual: { label: "Pago de Cuota Mensual", color: "#3A6EA5" },
   otros: { label: "Otros", color: "#6B6459" },
   // Alias para registros guardados antes de este cambio (esquemas anteriores)
-  prepago: { label: "Reducción de Cuota", color: "#8A5A2B" },
-  cuota: { label: "Reducción de Cuota", color: "#8A5A2B" },
-  plazo: { label: "Reducción de Plazo", color: "#3D6B54" },
+  prepago: { label: "Prepago - Reducción de Cuota", color: "#8A5A2B" },
+  cuota: { label: "Prepago - Reducción de Cuota", color: "#8A5A2B" },
+  plazo: { label: "Prepago - Reducción de Plazo", color: "#3D6B54" },
 };
 const MOTIVOS = CATEGORIAS;
 const TIPOS = CATEGORIAS;
@@ -572,6 +587,17 @@ async function subirConstancia(file, hermanoNombre, fechaPago) {
   await uploadBytes(storageRef, file);
   const url = await getDownloadURL(storageRef);
   return { url, nombre: nombreArchivo };
+}
+
+// Borra una constancia vieja de Storage cuando se reemplaza por una nueva.
+// Nunca revienta el guardado si falla (ej. si ya no existiera): solo avisa por consola.
+async function borrarConstancia(nombreArchivo) {
+  if (!nombreArchivo) return;
+  try {
+    await deleteObject(ref(storage, `constancias/${nombreArchivo}`));
+  } catch (e) {
+    console.warn("No se pudo borrar la constancia vieja:", nombreArchivo, e);
+  }
 }
 
 // Número de registro consecutivo (00001, 00002...), único aunque varios
@@ -604,6 +630,7 @@ let vistaAdminAportes = "todos"; // "todos" | "0" | "1" | "2"... (índice de la 
 let tabsAbiertas = []; // índices de personas con una pestaña dinámica abierta
 let ultimosYapesFiltrados = [];
 let ultimoBancoFiltrado = [];
+let ultimoReporteListado = { filtrado: [], total: 0, totalVerificado: 0 };
 let historialCuota = [];
 let bancoFiltro = { desde: "", hasta: "", numero: "", numOp: "", orden: "fecha_desc" };
 let bancoPagina = 1;
@@ -949,6 +976,7 @@ function editarYape(id) {
   document.getElementById("yape-monto").value = y.monto;
   document.getElementById("yape-fecha-pago").value = y.fechaPago;
   document.getElementById("yape-num-operacion").value = y.numeroOperacion || "";
+  document.getElementById("yape-num-cuota").value = y.numeroCuota || "";
   document.getElementById("yape-nota").value = y.nota || "";
   const sel = document.getElementById("yape-hermano");
   if (sel) sel.value = y.hermano;
@@ -962,6 +990,7 @@ document.getElementById("yape-cancelar-edicion").addEventListener("click", () =>
   yapeEditId = null;
   document.getElementById("yape-monto").value = "";
   document.getElementById("yape-num-operacion").value = "";
+  document.getElementById("yape-num-cuota").value = "";
   document.getElementById("yape-nota").value = "";
   document.getElementById("yape-imagen").value = "";
   document.getElementById("yape-add-btn").textContent = "Registrar pago";
@@ -986,6 +1015,10 @@ document.getElementById("yape-add-btn").addEventListener("click", async () => {
     if (file) {
       const r = await subirConstancia(file, NOMBRES_HERMANOS[hermanoIdx] || "hermano", fechaPago);
       imagenUrl = r.url; imagenNombre = r.nombre;
+      if (editando) {
+        const existente = yapes.find((y) => y.id === yapeEditId);
+        if (existente?.imagenNombre) await borrarConstancia(existente.imagenNombre);
+      }
     } else if (editando) {
       const existente = yapes.find((y) => y.id === yapeEditId);
       imagenUrl = existente?.imagenUrl || null;
@@ -997,6 +1030,7 @@ document.getElementById("yape-add-btn").addEventListener("click", async () => {
       motivo: document.getElementById("yape-motivo").value,
       fechaPago,
       numeroOperacion: document.getElementById("yape-num-operacion").value.trim(),
+      numeroCuota: document.getElementById("yape-num-cuota").value.trim(),
       monto,
       nota: document.getElementById("yape-nota").value.trim(),
       imagenUrl,
@@ -1012,6 +1046,7 @@ document.getElementById("yape-add-btn").addEventListener("click", async () => {
     }
     document.getElementById("yape-monto").value = "";
     document.getElementById("yape-num-operacion").value = "";
+    document.getElementById("yape-num-cuota").value = "";
     document.getElementById("yape-nota").value = "";
     fileInput.value = "";
   } catch (e) {
@@ -1034,7 +1069,10 @@ function editarBanco(id) {
   document.getElementById("banco-monto").value = p.monto;
   document.getElementById("banco-capital").value = p.montoCapital ?? "";
   document.getElementById("banco-num-operacion").value = p.numeroOperacion || "";
+  document.getElementById("banco-num-cuota").value = p.numeroCuota || "";
   document.getElementById("banco-nota").value = p.nota || "";
+  document.getElementById("banco-imagen-hint").textContent = p.imagenUrl ? "✓ Ya tiene una constancia guardada — déjalo vacío para conservarla" : "";
+  document.getElementById("banco-imagen2-hint").textContent = p.imagenUrl2 ? "✓ Ya tiene una constancia guardada — déjalo vacío para conservarla" : "";
   const btn = document.getElementById("banco-add-btn");
   btn.textContent = "Guardar cambios";
   document.getElementById("banco-cancelar-edicion").hidden = false;
@@ -1046,9 +1084,12 @@ document.getElementById("banco-cancelar-edicion").addEventListener("click", () =
   document.getElementById("banco-monto").value = "";
   document.getElementById("banco-capital").value = "";
   document.getElementById("banco-num-operacion").value = "";
+  document.getElementById("banco-num-cuota").value = "";
   document.getElementById("banco-nota").value = "";
   document.getElementById("banco-imagen").value = "";
   document.getElementById("banco-imagen2").value = "";
+  document.getElementById("banco-imagen-hint").textContent = "";
+  document.getElementById("banco-imagen2-hint").textContent = "";
   document.getElementById("banco-add-btn").textContent = "Agregar pago";
   document.getElementById("banco-cancelar-edicion").hidden = true;
 });
@@ -1074,6 +1115,7 @@ document.getElementById("banco-add-btn").addEventListener("click", async () => {
     if (file) {
       const r = await subirConstancia(file, "banco", fecha);
       imagenUrl = r.url; imagenNombre = r.nombre;
+      if (existente?.imagenNombre) await borrarConstancia(existente.imagenNombre);
     } else if (existente) {
       imagenUrl = existente.imagenUrl || null;
       imagenNombre = existente.imagenNombre || null;
@@ -1081,6 +1123,7 @@ document.getElementById("banco-add-btn").addEventListener("click", async () => {
     if (file2) {
       const r2 = await subirConstancia(file2, "banco2", fecha);
       imagenUrl2 = r2.url; imagenNombre2 = r2.nombre;
+      if (existente?.imagenNombre2) await borrarConstancia(existente.imagenNombre2);
     } else if (existente) {
       imagenUrl2 = existente.imagenUrl2 || null;
       imagenNombre2 = existente.imagenNombre2 || null;
@@ -1091,6 +1134,7 @@ document.getElementById("banco-add-btn").addEventListener("click", async () => {
       tipo: document.getElementById("banco-tipo").value,
       montoCapital: capitalVal ? Number(capitalVal) : null,
       numeroOperacion: document.getElementById("banco-num-operacion").value.trim(),
+      numeroCuota: document.getElementById("banco-num-cuota").value.trim(),
       nota: document.getElementById("banco-nota").value.trim(),
       imagenUrl,
       imagenNombre,
@@ -1108,7 +1152,10 @@ document.getElementById("banco-add-btn").addEventListener("click", async () => {
     document.getElementById("banco-monto").value = "";
     document.getElementById("banco-capital").value = "";
     document.getElementById("banco-num-operacion").value = "";
+    document.getElementById("banco-num-cuota").value = "";
     document.getElementById("banco-nota").value = "";
+    document.getElementById("banco-imagen-hint").textContent = "";
+    document.getElementById("banco-imagen2-hint").textContent = "";
     fileInput.value = "";
     fileInput2.value = "";
   } catch (e) {
@@ -1262,6 +1309,7 @@ function renderReporteListado() {
 
   const total = filtrado.reduce((s, y) => s + y.monto, 0);
   const totalVerificado = filtrado.filter((y) => y.estado === "verificado").reduce((s, y) => s + y.monto, 0);
+  ultimoReporteListado = { filtrado, total, totalVerificado, mes, anio, persona };
 
   const filas = filtrado.map((y) => {
     const m = CATEGORIAS[y.motivo] || CATEGORIAS.otros;
@@ -1499,6 +1547,7 @@ function renderAll() {
           <span class="motivo-tag" style="color:${m.color};border-color:${m.color}">${m.label}</span>
           ${medio ? `<span class="medio-tag">${medio}</span>` : ""}
           ${y.numeroOperacion ? `<span class="ledger-numero">Op. ${escapeHtml(y.numeroOperacion)}</span>` : ""}
+          ${y.numeroCuota ? `<span class="ledger-numero">Cuota N° ${escapeHtml(y.numeroCuota)}</span>` : ""}
           ${y.nota ? `<span class="nota">${escapeHtml(y.nota)}</span>` : ""}
           ${mostrarRegistro ? `<span class="ledger-registro">Registrado el ${formatFecha(fechaReg)}</span>` : ""}
         </div>
@@ -1586,6 +1635,7 @@ function renderAll() {
         <div class="ledger-mid">
           <span class="tipo-tag" style="color:${t.color};border-color:${t.color}">${t.label}</span>
           ${p.numeroOperacion ? `<span class="ledger-numero">Op. ${escapeHtml(p.numeroOperacion)}</span>` : ""}
+          ${p.numeroCuota ? `<span class="ledger-numero">Cuota N° ${escapeHtml(p.numeroCuota)}</span>` : ""}
           ${p.nota ? `<span class="nota">${escapeHtml(p.nota)}</span>` : ""}
         </div>
         <div class="ledger-actions">
@@ -1625,10 +1675,15 @@ document.addEventListener("click", async (e) => {
       await updateDoc(doc(db, "yapes", id), { estado: y.estado === "verificado" ? "pendiente" : "verificado" });
     } else if (action === "delete-yape") {
       if (!(await confirmarEliminar())) return;
+      const y = yapes.find((x) => x.id === id);
       await deleteDoc(doc(db, "yapes", id));
+      if (y?.imagenNombre) await borrarConstancia(y.imagenNombre);
     } else if (action === "delete-banco") {
       if (!(await confirmarEliminar())) return;
+      const p = pagosBanco.find((x) => x.id === id);
       await deleteDoc(doc(db, "pagosBanco", id));
+      if (p?.imagenNombre) await borrarConstancia(p.imagenNombre);
+      if (p?.imagenNombre2) await borrarConstancia(p.imagenNombre2);
     }
   } catch (err) { showError("No se pudo completar la acción."); }
 });
@@ -1644,6 +1699,47 @@ function autoAnchoColumnas(filas) {
   });
   return anchos.map((wch) => ({ wch }));
 }
+
+document.getElementById("reporte-pdf-btn").addEventListener("click", () => {
+  const { jsPDF } = window.jspdf;
+  const docPdf = new jsPDF();
+  const { filtrado, total, totalVerificado, mes, anio, persona } = ultimoReporteListado;
+
+  docPdf.setFontSize(14);
+  docPdf.text("Libreta Hipoteca — Listado General de Aportes", 14, 16);
+  docPdf.setFontSize(9);
+  const nombreMes = mes === "todos" ? "Todos los meses" : `${mes} - ${MESES_NOMBRE[Number(mes) - 1]}`;
+  const nombreAnio = anio === "todos" ? "Todos los años" : anio;
+  const nombrePersonaFiltro = persona === "todos" ? "Todas las personas" : (NOMBRES_HERMANOS[Number(persona)] || "");
+  docPdf.text(`Filtros: ${nombreMes} · ${nombreAnio} · ${nombrePersonaFiltro}`, 14, 22);
+  docPdf.text(`Generado el ${new Date().toLocaleDateString("es-PE")}`, 14, 27);
+
+  const filas = filtrado.map((y) => [
+    formatNumero(y.numero),
+    formatFecha(y.fechaPago),
+    rol.tipo === "hermano" ? nombreActual() : (NOMBRES_HERMANOS[y.hermano] || "—"),
+    (CATEGORIAS[y.motivo] || {}).label || y.motivo || "",
+    MEDIOS[y.medioPago] || "",
+    formatSoles(y.monto),
+    y.estado === "verificado" ? "Verificado" : "Pendiente",
+  ]);
+
+  docPdf.autoTable({
+    startY: 32,
+    head: [["N°", "Fecha", "Persona", "Motivo", "Medio", "Monto", "Estado"]],
+    body: filas,
+    foot: [
+      [{ content: `TOTAL (${filtrado.length} registros)`, colSpan: 5 }, formatSoles(total), ""],
+      [{ content: "Verificado", colSpan: 5 }, formatSoles(totalVerificado), ""],
+    ],
+    styles: { fontSize: 8, cellPadding: 3 },
+    headStyles: { fillColor: [22, 35, 61] },
+    footStyles: { fillColor: [243, 239, 228], textColor: [22, 35, 61], fontStyle: "bold" },
+    columnStyles: { 5: { halign: "right" } },
+  });
+
+  docPdf.save(`listado_aportes_${new Date().toISOString().slice(0, 10)}.pdf`);
+});
 
 function generarLibroBackup() {
   const wb = XLSX.utils.book_new();
