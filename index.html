@@ -275,7 +275,7 @@
           <input id="cuota-actual-edit" type="number" class="cuota-input" hidden />
         </div>
         <div class="cuota-col">
-          <div class="cuota-label">Reducción lograda</div>
+          <div class="cuota-label">Cuota baja (no es el ahorro total)</div>
           <div class="cuota-reduccion" id="cuota-reduccion"></div>
         </div>
         <button class="edit-btn" id="edit-config-btn">Editar</button>
@@ -294,10 +294,13 @@
 
       <div id="aviso-pendientes" class="aviso-pendientes" hidden></div>
 
-      <div id="ahorro-real-card" class="hermano-card" style="margin-bottom:16px;" hidden>
-        <div class="hermano-nombre">💰 Ahorro real confirmado (según cronogramas de Interbank)</div>
-        <div class="hermano-monto" id="ahorro-real-monto"></div>
-        <div class="hermano-desglose" id="ahorro-real-detalle"></div>
+      <div id="ahorro-real-card" style="margin-bottom:16px;background:#0F3D2E;border-radius:10px;padding:18px 20px;" hidden>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.06em;color:#8FCBAE;text-transform:uppercase;">💰 Ahorro real verificado con Interbank</div>
+        <div id="ahorro-real-monto" style="font-family:'IBM Plex Mono',monospace;font-size:32px;font-weight:700;color:#FAF8F3;margin:4px 0 8px;"></div>
+        <div id="ahorro-real-detalle" style="font-size:12px;color:#B9E0CD;"></div>
+        <div style="font-size:11px;color:#7FAF9A;margin-top:8px;border-top:1px solid #1D5A44;padding-top:8px;">
+          Este número sale de comparar el cronograma original con el más reciente que subió el Administrador — no se calcula multiplicando la reducción mensual por los meses restantes (esa cuenta da un resultado distinto y no es correcta).
+        </div>
       </div>
 
       <div id="actualizar-cronograma-box" class="form" style="margin-bottom:16px;" hidden>
@@ -342,13 +345,13 @@
             <div class="total-label">Verificado</div>
             <div class="total-value sage" id="total-verificado"></div>
           </div>
+          <div class="total-box" style="background:#FDECEA;">
+            <div class="total-label" style="color:#8B241A;">Pendiente verificar</div>
+            <div class="total-value" id="total-pendiente" style="color:#C0392B;"></div>
+          </div>
           <div class="total-box">
             <div class="total-label">Total pagado</div>
             <div class="total-value" id="total-pagado" style="color:#16233D;"></div>
-          </div>
-          <div class="total-box">
-            <div class="total-label">Pendiente verificar</div>
-            <div class="total-value muted" id="total-pendiente"></div>
           </div>
           <div class="total-box">
             <div class="total-label">Reducción de cuota</div>
@@ -813,8 +816,13 @@ function aplicarRol() {
     document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
     document.querySelector('.tab-btn[data-tab="yapes"]').classList.add("active");
   } else {
-    // Por defecto, el Administrador entra viendo su propia pestaña de aportes
-    abrirTabPersona(IDX_ADMIN_APORTANTE);
+    vistaAdminAportes = "todos";
+    document.getElementById("tab-yapes").hidden = false;
+    document.getElementById("tab-banco").hidden = true;
+    document.getElementById("tab-reportes").hidden = true;
+    document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
+    document.getElementById("tab-btn-yapes").classList.add("active");
+    renderTabsDinamicas();
   }
 }
 
@@ -2251,41 +2259,60 @@ document.getElementById("reporte-banco-pdf-btn").addEventListener("click", () =>
   docPdf.setFontSize(9);
   docPdf.text(`Filtros: ${desde ? formatFecha(desde) : "…"} a ${hasta ? formatFecha(hasta) : "…"}`, 14, 22);
   docPdf.text(`Generado el ${new Date().toLocaleDateString("es-PE")}`, 14, 27);
+  docPdf.setFontSize(7);
+  docPdf.text("Cada pago (fila resaltada) va seguido de sus aportes vinculados (líneas con ↳).", 14, 31);
 
+  const body = [];
+  const filasCabecera = [];
   let totalVinculadoGlobal = 0;
-  const filas = filtrado.map((p) => {
+  filtrado.forEach((p) => {
+    const capitalFila = p.montoCapital || p.monto;
+    const interesFila = p.monto - capitalFila;
     const vinculados = aportesVinculados(p.id);
     const totalVinc = vinculados.reduce((s, y) => s + y.monto, 0);
     totalVinculadoGlobal += totalVinc;
-    const interes = p.monto - (p.montoCapital || p.monto);
-    const detalle = vinculados.length
-      ? vinculados.map((v) => `${NOMBRES_HERMANOS[v.hermano] || "—"}: ${formatSoles(v.monto)}`).join(" / ")
-      : "Sin vincular";
     const diferencia = Math.round((p.monto - totalVinc) * 100) / 100;
     const cuadra = Math.abs(diferencia) < 0.01 ? "Cuadra" : (diferencia > 0 ? `Falta ${formatSoles(diferencia)}` : `Sobra ${formatSoles(-diferencia)}`);
-    return [
+
+    filasCabecera.push(body.length);
+    body.push([
       p.numeroOperacion || formatNumero(p.numero),
       formatFecha(p.fecha),
       (CATEGORIAS[p.tipo] || {}).label || p.tipo || "",
       formatSoles(p.monto),
-      formatSoles(p.montoCapital || p.monto),
-      formatSoles(interes),
-      detalle,
+      formatSoles(capitalFila),
+      formatSoles(interesFila),
       cuadra,
-    ];
+    ]);
+    if (vinculados.length) {
+      vinculados.forEach((v) => {
+        body.push([`   ↳ ${NOMBRES_HERMANOS[v.hermano] || "—"}`, formatFecha(v.fechaPago), "Aporte vinculado", formatSoles(v.monto), "", "", ""]);
+      });
+    } else {
+      body.push(["   ↳ Sin aportes vinculados", "", "", "", "", "", ""]);
+    }
   });
 
   docPdf.autoTable({
-    startY: 32,
-    head: [["N° Operación", "Fecha", "Tipo", "Monto", "A capital", "Interés/seguro", "Aportes vinculados", "Estado"]],
-    body: filas,
+    startY: 35,
+    head: [["N° Operación / Persona", "Fecha", "Tipo", "Monto", "A capital", "Interés/seg", "Estado"]],
+    body,
     foot: [
-      [{ content: `TOTAL (${filtrado.length} registros)`, colSpan: 3 }, formatSoles(total), formatSoles(totalCapital), formatSoles(totalInteres), `Vinculado: ${formatSoles(totalVinculadoGlobal)}`, ""],
+      [{ content: `TOTAL (${filtrado.length} pagos)`, colSpan: 3 }, formatSoles(total), formatSoles(totalCapital), formatSoles(totalInteres), ""],
+      [{ content: "Total vinculado con aportes", colSpan: 3 }, formatSoles(totalVinculadoGlobal), "", "", ""],
     ],
     styles: { fontSize: 7, cellPadding: 3 },
     headStyles: { fillColor: [22, 35, 61], fontSize: 7 },
     footStyles: { fillColor: [243, 239, 228], textColor: [22, 35, 61], fontStyle: "bold", fontSize: 7 },
     columnStyles: { 3: { halign: "right" }, 4: { halign: "right" }, 5: { halign: "right" } },
+    didParseCell: (data) => {
+      if (data.section === "body" && filasCabecera.includes(data.row.index)) {
+        data.cell.styles.fontStyle = "bold";
+        data.cell.styles.fillColor = [243, 239, 228];
+      } else if (data.section === "body") {
+        data.cell.styles.textColor = [110, 100, 89];
+      }
+    },
   });
 
   docPdf.save(`pagos_banco_${new Date().toISOString().slice(0, 10)}.pdf`);
