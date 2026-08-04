@@ -123,6 +123,7 @@
     border:1px solid;border-radius:10px;padding:3px 8px;cursor:pointer;background:transparent;flex-shrink:0;white-space:nowrap;}
   .estado-btn.verificado{color:var(--sage);border-color:var(--sage);}
   .estado-btn.pendiente{color:var(--brass2);border-color:var(--brass2);}
+  .estado-btn.pagado{color:#16233D;border-color:#16233D;background:#EEF1F4;}
   .del-btn{background:transparent;border:none;color:#C08A6A;cursor:pointer;padding:4px 6px;flex-shrink:0;
     font-size:15px;font-weight:700;}
   .filtros-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;}
@@ -154,6 +155,10 @@
   .vinculo-agregar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
   .vinculo-select{font-size:12px;padding:6px 8px;border-radius:5px;border:1px solid #D3CBB8;background:#fff;
     color:var(--ink);flex:1;min-width:180px;}
+  .reporte-grupo{border:1px solid var(--border);border-radius:8px;margin-bottom:10px;overflow:hidden;}
+  .reporte-grupo-header{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;
+    background:var(--card);padding:10px 12px;flex-wrap:wrap;}
+  .reporte-grupo-detalle{padding:8px 12px;display:flex;flex-direction:column;gap:4px;}
   .export-btn:hover{background:var(--brass);color:#fff;}
   .modal-overlay{position:fixed;inset:0;background:rgba(22,35,61,.45);display:flex;align-items:center;
     justify-content:center;z-index:1000;padding:20px;}
@@ -225,6 +230,16 @@
     <div class="modal-actions">
       <button id="modal-cancel" class="modal-btn-secondary">Cancelar</button>
       <button id="modal-confirm" class="modal-btn-danger">Eliminar</button>
+    </div>
+  </div>
+</div>
+
+<div id="detalle-modal" class="modal-overlay" hidden>
+  <div class="modal-box" style="max-width:380px;">
+    <div class="modal-title">Detalle del aporte</div>
+    <div class="modal-text" id="detalle-modal-body" style="line-height:1.7;"></div>
+    <div class="modal-actions">
+      <button id="detalle-modal-cerrar" class="modal-btn-secondary">Cerrar</button>
     </div>
   </div>
 </div>
@@ -400,7 +415,13 @@
               <label class="field-label">N° Cuota (opcional)</label>
               <input id="yape-num-cuota" type="text" placeholder="Ej. 61" />
             </div>
-            <input id="yape-nota" placeholder="Nota (opcional)" />
+            <div class="field-col">
+              <label class="field-label">N° Pago (vinculado al banco)</label>
+              <div id="yape-num-pago-vinculado" class="hermano-fijo" style="font-size:12px;color:var(--muted);font-weight:400;">No vinculado todavía</div>
+            </div>
+          </div>
+          <div class="form-row">
+            <input id="yape-nota" placeholder="Nota (opcional)" style="grid-column:1/-1" />
           </div>
           <button class="add-btn" id="yape-add-btn">Registrar pago</button>
           <button class="cambiar-rol" id="yape-cancelar-edicion" hidden style="margin-top:4px;">Cancelar edición</button>
@@ -415,6 +436,7 @@
             <option value="todos">Todos los estados</option>
             <option value="verificado">Verificado</option>
             <option value="pendiente">Pendiente</option>
+            <option value="pagado">Pagado</option>
           </select>
           <select id="filtro-yape-hermano"></select>
           <input id="filtro-yape-desde" type="date" title="Desde" />
@@ -553,6 +575,12 @@
               <select id="reporte-anio"></select>
               <select id="reporte-persona"></select>
               <select id="reporte-tipo"></select>
+              <select id="reporte-estado">
+                <option value="todos">Todos los estados</option>
+                <option value="verificado">Verificado</option>
+                <option value="pendiente">Pendiente</option>
+                <option value="pagado">Pagado</option>
+              </select>
             </div>
             <button class="export-btn" id="reporte-pdf-btn">📄 Descargar PDF</button>
           </div>
@@ -567,6 +595,12 @@
               <input id="reporte-fecha-hasta" type="date" title="Hasta" />
               <select id="reporte-fecha-persona"></select>
               <select id="reporte-fecha-tipo"></select>
+              <select id="reporte-fecha-estado">
+                <option value="todos">Todos los estados</option>
+                <option value="verificado">Verificado</option>
+                <option value="pendiente">Pendiente</option>
+                <option value="pagado">Pagado</option>
+              </select>
             </div>
             <button class="export-btn" id="reporte-fecha-pdf-btn">📄 Descargar PDF</button>
           </div>
@@ -790,12 +824,15 @@ function formatFecha(iso) {
   const meses = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
   return `${d} ${meses[parseInt(m,10)-1]} ${y}`;
 }
-function confirmarEliminar() {
+function mostrarConfirmacion(titulo, mensaje, textoConfirmar) {
   return new Promise((resolve) => {
     const overlay = document.getElementById("confirm-modal");
+    overlay.querySelector(".modal-title").textContent = titulo;
+    overlay.querySelector(".modal-text").textContent = mensaje;
+    const confirmBtn = document.getElementById("modal-confirm");
+    confirmBtn.textContent = textoConfirmar || "Confirmar";
     overlay.hidden = false;
     const cancelBtn = document.getElementById("modal-cancel");
-    const confirmBtn = document.getElementById("modal-confirm");
     function cleanup(resultado) {
       overlay.hidden = true;
       cancelBtn.removeEventListener("click", onCancel);
@@ -808,6 +845,36 @@ function confirmarEliminar() {
     confirmBtn.addEventListener("click", onConfirm);
   });
 }
+function confirmarEliminar() {
+  return mostrarConfirmacion("Eliminar registro", "¿Seguro que quieres eliminar este registro? Esta acción no se puede deshacer.", "Eliminar");
+}
+
+function mostrarDetalleAporte(id) {
+  const y = yapes.find((x) => x.id === id);
+  if (!y) return;
+  const m = MOTIVOS[y.motivo] || MOTIVOS.prepago;
+  const pagoVinculado = y.pagoBancoId ? pagosBanco.find((p) => p.id === y.pagoBancoId) : null;
+  const filas = [
+    ["Persona", NOMBRES_HERMANOS[y.hermano] || "—"],
+    ["Monto", formatSoles(y.monto)],
+    ["Fecha de pago", formatFecha(y.fechaPago)],
+    ["Mes que corresponde", y.mesCorresponde || periodoDe(y)],
+    ["Motivo", m.label],
+    ["Medio de pago", MEDIOS[y.medioPago] || "—"],
+    ["N° de operación", y.numeroOperacion || "—"],
+    ["N° de registro", formatNumero(y.numero)],
+    ["Estado", labelEstado(y.estado)],
+    ["Nota", y.nota || "—"],
+    ["Pago al banco vinculado", pagoVinculado ? `N°${formatNumero(pagoVinculado.numero)} · ${formatFecha(pagoVinculado.fecha)}` : "No vinculado"],
+  ];
+  document.getElementById("detalle-modal-body").innerHTML = filas.map(([k, v]) =>
+    `<div style="display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:3px 0;border-bottom:1px solid #EFEADB;"><span style="color:var(--muted);">${k}</span><span style="text-align:right;font-weight:600;">${escapeHtml(String(v))}</span></div>`
+  ).join("");
+  document.getElementById("detalle-modal").hidden = false;
+}
+document.getElementById("detalle-modal-cerrar").addEventListener("click", () => {
+  document.getElementById("detalle-modal").hidden = true;
+});
 
 function showError(msg) {
   const box = document.getElementById("error-box");
@@ -1109,6 +1176,14 @@ function editarYape(id) {
   document.getElementById("yape-num-cuota").value = y.numeroCuota || "";
   document.getElementById("yape-nota").value = y.nota || "";
   document.getElementById("yape-imagen-hint").textContent = y.imagenUrl ? "✓ Ya tiene una constancia guardada — déjalo vacío para conservarla" : "";
+  if (y.pagoBancoId) {
+    const pagoVinculado = pagosBanco.find((p) => p.id === y.pagoBancoId);
+    document.getElementById("yape-num-pago-vinculado").textContent = pagoVinculado
+      ? (pagoVinculado.numeroOperacion || `Pago N°${formatNumero(pagoVinculado.numero)} (sin N° operación)`)
+      : "Vinculado (pago no encontrado)";
+  } else {
+    document.getElementById("yape-num-pago-vinculado").textContent = "No vinculado todavía";
+  }
   const sel = document.getElementById("yape-hermano");
   if (sel) sel.value = y.hermano;
   const btn = document.getElementById("yape-add-btn");
@@ -1125,6 +1200,7 @@ document.getElementById("yape-cancelar-edicion").addEventListener("click", () =>
   document.getElementById("yape-nota").value = "";
   document.getElementById("yape-imagen").value = "";
   document.getElementById("yape-imagen-hint").textContent = "";
+  document.getElementById("yape-num-pago-vinculado").textContent = "No vinculado todavía";
   document.getElementById("yape-mes-corresponde").value = document.getElementById("yape-fecha-pago").value.slice(0, 7);
   mesCorrespondeTocado = false;
   document.getElementById("yape-add-btn").textContent = "Registrar pago";
@@ -1136,6 +1212,22 @@ document.getElementById("yape-add-btn").addEventListener("click", async () => {
   if (!monto || monto <= 0) return;
   const hermanoIdx = rol.tipo === "hermano" ? rol.hermanoIdx : Number(document.getElementById("yape-hermano").value);
   const fechaPago = document.getElementById("yape-fecha-pago").value;
+  const mesCorresponde = document.getElementById("yape-mes-corresponde").value || fechaPago.slice(0, 7);
+
+  // Si el mes que corresponde no coincide con el mes real de la fecha de
+  // pago, se pide confirmar explícitamente (para el caso de pagar en agosto
+  // lo que corresponde a julio, y evitar que sea un error de dedo).
+  if (mesCorresponde !== fechaPago.slice(0, 7)) {
+    const [anioM, mesM] = mesCorresponde.split("-");
+    const nombreMesCorresponde = `${MESES_NOMBRE[Number(mesM) - 1]} ${anioM}`;
+    const confirmado = await mostrarConfirmacion(
+      "Confirma el mes del aporte",
+      `Tu fecha de pago es ${formatFecha(fechaPago)}, pero marcaste que corresponde a ${nombreMesCorresponde}. ¿Es correcto?`,
+      "Sí, es correcto"
+    );
+    if (!confirmado) return;
+  }
+
   const fileInput = document.getElementById("yape-imagen");
   const file = fileInput.files[0] || null;
   const btn = document.getElementById("yape-add-btn");
@@ -1184,6 +1276,7 @@ document.getElementById("yape-add-btn").addEventListener("click", async () => {
     document.getElementById("yape-num-cuota").value = "";
     document.getElementById("yape-nota").value = "";
     document.getElementById("yape-imagen-hint").textContent = "";
+    document.getElementById("yape-num-pago-vinculado").textContent = "No vinculado todavía";
     document.getElementById("yape-mes-corresponde").value = document.getElementById("yape-fecha-pago").value.slice(0, 7);
     mesCorrespondeTocado = false;
     fileInput.value = "";
@@ -1472,6 +1565,12 @@ function poblarSelectTipo(sel) {
 }
 // Resuelve a qué mes corresponde un aporte: el que el usuario marcó
 // explícitamente, o si no marcó nada, el mes de la fecha real de pago.
+function labelEstado(estado) {
+  if (estado === "pagado") return "💰 Pagado";
+  if (estado === "verificado") return "✓ Verificado";
+  return "⏳ Pendiente";
+}
+
 // Aportes ya vinculados a un pago al banco específico
 function aportesVinculados(pagoId) {
   return yapes.filter((y) => y.pagoBancoId === pagoId);
@@ -1548,11 +1647,13 @@ function renderReporteListado() {
 
   const selTipo = document.getElementById("reporte-tipo");
   poblarSelectTipo(selTipo);
+  const selEstado = document.getElementById("reporte-estado");
 
   const mes = selMes.value || "todos";
   const anio = selAnio.value || "todos";
   const persona = rol.tipo === "hermano" ? String(rol.hermanoIdx) : (selPersona.value || "todos");
   const tipo = selTipo.value || "todos";
+  const estadoFiltro = selEstado.value || "todos";
 
   const base = rol.tipo === "hermano" ? yapes.filter((y) => y.hermano === rol.hermanoIdx) : yapes;
   const filtrado = base.filter((y) => {
@@ -1561,6 +1662,7 @@ function renderReporteListado() {
     if (anio !== "todos" && periodo.slice(0, 4) !== anio) return false;
     if (persona !== "todos" && String(y.hermano) !== persona) return false;
     if (!coincideTipo(y.motivo, tipo)) return false;
+    if (estadoFiltro !== "todos" && y.estado !== estadoFiltro) return false;
     return true;
   }).sort((a, b) => (a.fechaPago < b.fechaPago ? 1 : a.fechaPago > b.fechaPago ? -1 : 0));
 
@@ -1585,11 +1687,13 @@ function renderReporteFecha() {
   }
   const selTipo = document.getElementById("reporte-fecha-tipo");
   poblarSelectTipo(selTipo);
+  const selEstado = document.getElementById("reporte-fecha-estado");
 
   const desde = document.getElementById("reporte-fecha-desde").value;
   const hasta = document.getElementById("reporte-fecha-hasta").value;
   const persona = rol.tipo === "hermano" ? String(rol.hermanoIdx) : (selPersona.value || "todos");
   const tipo = selTipo.value || "todos";
+  const estadoFiltro = selEstado.value || "todos";
 
   // Como fechaPago se guarda solo como AAAA-MM-DD (sin hora), comparar con
   // "<= hasta" ya incluye el día completo de "hasta" automáticamente.
@@ -1599,6 +1703,7 @@ function renderReporteFecha() {
     if (hasta && y.fechaPago > hasta) return false;
     if (persona !== "todos" && String(y.hermano) !== persona) return false;
     if (!coincideTipo(y.motivo, tipo)) return false;
+    if (estadoFiltro !== "todos" && y.estado !== estadoFiltro) return false;
     return true;
   }).sort((a, b) => (a.fechaPago < b.fechaPago ? 1 : a.fechaPago > b.fechaPago ? -1 : 0));
 
@@ -1630,33 +1735,53 @@ function renderReportePagosBanco() {
   const totalInteres = filtrado.reduce((s, p) => s + (p.montoCapital ? p.monto - p.montoCapital : 0), 0);
   ultimoReportePagosBanco = { filtrado, total, totalCapital, totalInteres, desde, hasta, tipo };
 
-  const filas = filtrado.map((p) => {
+  let totalVinculadoGlobal = 0;
+  const grupos = filtrado.map((p) => {
     const t = CATEGORIAS[p.tipo] || CATEGORIAS.otros;
-    return `<tr>
-      <td>${escapeHtml(p.numeroOperacion || formatNumero(p.numero))}</td>
-      <td>${formatFecha(p.fecha)}</td>
-      <td>${t.label}</td>
-      <td style="text-align:right;">${formatSoles(p.monto)}</td>
-      <td style="text-align:right;">${formatSoles(p.montoCapital || p.monto)}</td>
-      <td>${escapeHtml(p.nota || "")}</td>
-    </tr>`;
+    const vinculados = aportesVinculados(p.id);
+    const totalVinculado = vinculados.reduce((s, y) => s + y.monto, 0);
+    totalVinculadoGlobal += totalVinculado;
+    const diferencia = Math.round((p.monto - totalVinculado) * 100) / 100;
+    const cuadraTexto = Math.abs(diferencia) < 0.01
+      ? `<span style="color:var(--sage);">✅ Cuadra</span>`
+      : diferencia > 0
+        ? `<span style="color:var(--brass2);">⚠️ Falta ${formatSoles(diferencia)}</span>`
+        : `<span style="color:var(--danger);">⚠️ Sobra ${formatSoles(-diferencia)}</span>`;
+    const detalle = vinculados.length
+      ? vinculados.map((v) => `<div class="vinculo-item"><span>${escapeHtml(NOMBRES_HERMANOS[v.hermano] || "—")} · ${formatFecha(v.fechaPago)}</span><span style="font-weight:600;">${formatSoles(v.monto)}</span></div>`).join("")
+      : `<div class="empty" style="padding:4px 0;">Sin aportes vinculados.</div>`;
+    return `
+      <div class="reporte-grupo">
+        <div class="reporte-grupo-header">
+          <div>
+            <div style="font-weight:600;font-size:14px;">${escapeHtml(p.numeroOperacion || ("N° registro " + formatNumero(p.numero)))}</div>
+            <div style="margin-top:4px;">
+              <span class="tipo-tag" style="color:${t.color};border-color:${t.color};">${t.label}</span>
+              <span class="ledger-numero" style="margin-left:8px;">${formatFecha(p.fecha)}${p.fechaVencimiento ? " · Vence " + formatFecha(p.fechaVencimiento) : ""}</span>
+            </div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-weight:600;font-size:15px;">${formatSoles(p.monto)}</div>
+            <div style="font-size:11px;margin-top:2px;">${cuadraTexto}</div>
+          </div>
+        </div>
+        <div class="reporte-grupo-detalle">${detalle}</div>
+      </div>`;
   }).join("");
 
   document.getElementById("reporte-banco-tabla").innerHTML = `
-    <table class="reporte-table">
-      <thead><tr><th>N° Operación</th><th>Fecha</th><th>Tipo</th><th style="text-align:right;">Monto</th><th style="text-align:right;">A capital</th><th>Nota</th></tr></thead>
-      <tbody>${filas || `<tr><td colspan="6" class="empty">Sin registros para este filtro.</td></tr>`}</tbody>
-      <tfoot>
-        <tr><td colspan="3">TOTAL (${filtrado.length} registro${filtrado.length === 1 ? "" : "s"})</td><td style="text-align:right;">${formatSoles(total)}</td><td style="text-align:right;">${formatSoles(totalCapital)}</td><td></td></tr>
-        <tr><td colspan="3">Interés/seguro</td><td colspan="2" style="text-align:right;">${formatSoles(totalInteres)}</td><td></td></tr>
-      </tfoot>
-    </table>`;
+    ${grupos || `<div class="empty">Sin registros para este filtro.</div>`}
+    <div class="hermano-card" style="margin-top:8px;">
+      <div class="hermano-nombre">Totales del filtro (${filtrado.length} pago${filtrado.length === 1 ? "" : "s"})</div>
+      <div class="hermano-monto">${formatSoles(total)}</div>
+      <div class="hermano-desglose">A capital ${formatSoles(totalCapital)} · Interés/seguro ${formatSoles(totalInteres)} · Vinculado con aportes ${formatSoles(totalVinculadoGlobal)}</div>
+    </div>`;
 }
 
-["reporte-mes", "reporte-anio", "reporte-persona", "reporte-tipo"].forEach((id) => {
+["reporte-mes", "reporte-anio", "reporte-persona", "reporte-tipo", "reporte-estado"].forEach((id) => {
   document.getElementById(id).addEventListener("change", renderReporteListado);
 });
-["reporte-fecha-desde", "reporte-fecha-hasta", "reporte-fecha-persona", "reporte-fecha-tipo"].forEach((id) => {
+["reporte-fecha-desde", "reporte-fecha-hasta", "reporte-fecha-persona", "reporte-fecha-tipo", "reporte-fecha-estado"].forEach((id) => {
   document.getElementById(id).addEventListener("change", renderReporteFecha);
 });
 ["reporte-banco-desde", "reporte-banco-hasta", "reporte-banco-tipo"].forEach((id) => {
@@ -1829,11 +1954,12 @@ function renderAll() {
       const medio = MEDIOS[y.medioPago] || null;
       const fechaReg = y.fechaRegistro ? y.fechaRegistro.slice(0, 10) : null;
       const mostrarRegistro = fechaReg && fechaReg !== y.fechaPago;
+      const pagoVinculado = y.pagoBancoId ? pagosBanco.find((p) => p.id === y.pagoBancoId) : null;
       const row = document.createElement("div");
       row.className = "ledger-row";
       row.innerHTML = `
         <div class="ledger-row-top">
-          <div class="ledger-date">N° ${formatNumero(y.numero)} · ${formatFecha(y.fechaPago)}</div>
+          <div class="ledger-date">Fecha de pago: ${formatFecha(y.fechaPago)} · N° ${formatNumero(y.numero)}${pagoVinculado ? ` · Pago banco N°${formatNumero(pagoVinculado.numero)}` : ""}</div>
           <div class="ledger-monto">${formatSoles(y.monto)}</div>
         </div>
         <div class="ledger-mid">
@@ -1846,9 +1972,9 @@ function renderAll() {
           ${mostrarRegistro ? `<span class="ledger-registro">Registrado el ${formatFecha(fechaReg)}</span>` : ""}
         </div>
         <div class="ledger-actions">
-          ${rol.tipo === "hermano"
-            ? `<span class="estado-btn ${y.estado}" style="cursor:default;">${y.estado === "verificado" ? "✓ Verificado" : "⏳ Pendiente"}</span>`
-            : `<button class="estado-btn ${y.estado}" data-id="${y.id}" data-action="toggle">${y.estado === "verificado" ? "✓ Verificado" : "⏳ Pendiente"}</button>`
+          ${rol.tipo === "hermano" || y.estado === "pagado"
+            ? `<span class="estado-btn ${y.estado}" style="cursor:default;">${labelEstado(y.estado)}</span>`
+            : `<button class="estado-btn ${y.estado}" data-id="${y.id}" data-action="toggle">${labelEstado(y.estado)}</button>`
           }
           ${y.imagenUrl ? `<a class="view-btn" href="${y.imagenUrl}" target="_blank" rel="noopener" title="Ver constancia">🖼</a>` : ""}
           <button class="del-btn" data-id="${y.id}" data-action="edit-yape" title="Editar">✎</button>
@@ -1946,14 +2072,17 @@ function renderAll() {
           <div class="vinculo-lista">
             ${vinculados.map((v) => `
               <div class="vinculo-item">
-                <span>${escapeHtml(NOMBRES_HERMANOS[v.hermano] || "—")} · N°${formatNumero(v.numero)} · ${formatSoles(v.monto)}</span>
-                <button class="del-btn" data-action="desvincular-aporte" data-id="${v.id}">Desvincular</button>
+                <span>${escapeHtml(NOMBRES_HERMANOS[v.hermano] || "—")} · ${formatFecha(v.fechaPago)} · ${formatSoles(v.monto)} · N°${formatNumero(v.numero)}${v.numeroOperacion ? " · Op." + escapeHtml(v.numeroOperacion) : ""}</span>
+                <span style="display:flex;gap:4px;flex-shrink:0;">
+                  <button class="del-btn" data-action="ver-detalle-aporte" data-id="${v.id}" title="Ver detalle">Ir</button>
+                  <button class="del-btn" data-action="desvincular-aporte" data-id="${v.id}">Desvincular</button>
+                </span>
               </div>`).join("") || `<div class="empty" style="padding:6px 0;">Ningún aporte vinculado todavía.</div>`}
           </div>
           <div class="vinculo-agregar">
             <select class="vinculo-select" id="vinculo-select-${p.id}">
               <option value="">-- elegir aporte verificado suelto --</option>
-              ${disponibles.map((d) => `<option value="${d.id}">${escapeHtml(NOMBRES_HERMANOS[d.hermano] || "—")} · N°${formatNumero(d.numero)} · ${formatSoles(d.monto)}</option>`).join("")}
+              ${disponibles.map((d) => `<option value="${d.id}">${escapeHtml(NOMBRES_HERMANOS[d.hermano] || "—")} · ${formatFecha(d.fechaPago)} · ${formatSoles(d.monto)} · N°${formatNumero(d.numero)}</option>`).join("")}
             </select>
             <button class="add-btn" data-action="vincular-aporte" data-pago-id="${p.id}" style="margin-top:6px;">+ Vincular aporte</button>
           </div>
@@ -1996,12 +2125,13 @@ document.addEventListener("click", async (e) => {
     const sel = document.getElementById(`vinculo-select-${pagoId}`);
     const yapeId = sel ? sel.value : "";
     if (!yapeId) { showError("Elige un aporte de la lista antes de vincular."); return; }
-    try { await updateDoc(doc(db, "yapes", yapeId), { pagoBancoId: pagoId }); }
+    try { await updateDoc(doc(db, "yapes", yapeId), { pagoBancoId: pagoId, estado: "pagado" }); }
     catch (err) { showError("No se pudo vincular el aporte."); }
     return;
   }
+  if (action === "ver-detalle-aporte") { mostrarDetalleAporte(id); return; }
   if (action === "desvincular-aporte") {
-    try { await updateDoc(doc(db, "yapes", id), { pagoBancoId: null }); }
+    try { await updateDoc(doc(db, "yapes", id), { pagoBancoId: null, estado: "verificado" }); }
     catch (err) { showError("No se pudo desvincular el aporte."); }
     return;
   }
@@ -2024,7 +2154,7 @@ document.addEventListener("click", async (e) => {
       // Los aportes que estaban vinculados a este pago quedan sueltos otra vez
       const vinculadosAlBorrado = yapes.filter((y) => y.pagoBancoId === id);
       for (const v of vinculadosAlBorrado) {
-        await updateDoc(doc(db, "yapes", v.id), { pagoBancoId: null });
+        await updateDoc(doc(db, "yapes", v.id), { pagoBancoId: null, estado: "verificado" });
       }
     }
   } catch (err) { showError("No se pudo completar la acción."); }
