@@ -256,7 +256,7 @@
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
           <button class="cambiar-rol" id="cambiar-rol-btn">Cerrar sesión</button>
           <button class="export-btn" id="backup-excel-btn" hidden>💾 Respaldo Excel</button>
-          <button class="export-btn" id="verificar-numeros-btn" hidden>🔧 Verificar N° faltantes</button>
+          <button class="export-btn" id="verificar-numeros-btn" hidden>🔧 Verificar y reparar registros</button>
         </div>
       </div>
 
@@ -341,6 +341,10 @@
           <div class="total-box">
             <div class="total-label">Verificado</div>
             <div class="total-value sage" id="total-verificado"></div>
+          </div>
+          <div class="total-box">
+            <div class="total-label">Total pagado</div>
+            <div class="total-value" id="total-pagado" style="color:#16233D;"></div>
           </div>
           <div class="total-box">
             <div class="total-label">Pendiente verificar</div>
@@ -435,7 +439,7 @@
           <select id="filtro-yape-estado">
             <option value="todos">Todos los estados</option>
             <option value="verificado">Verificado</option>
-            <option value="pendiente">Pendiente</option>
+            <option value="pendiente" selected>Pendiente</option>
             <option value="pagado">Pagado</option>
           </select>
           <select id="filtro-yape-hermano"></select>
@@ -753,7 +757,7 @@ let pagosBanco = [];
 let editingConfig = false;
 let rol = null; // { tipo: "hermano", hermanoIdx: 0 } | { tipo: "encargado" }
 const PAGE_SIZE = 10;
-let yapesFiltro = { estado: "todos", hermano: "todos", desde: "", hasta: "", numero: "", numOp: "", orden: "fecha_desc" };
+let yapesFiltro = { estado: "pendiente", hermano: "todos", desde: "", hasta: "", numero: "", numOp: "", orden: "fecha_desc" };
 let yapesPagina = 1;
 let vistaAdminAportes = "todos"; // "todos" | "0" | "1" | "2"... (índice de la persona cuya pestaña está activa)
 let tabsAbiertas = []; // índices de personas con una pestaña dinámica abierta
@@ -1604,7 +1608,7 @@ function construirFilasAportes(filtrado) {
       <td>${m.label}</td>
       <td>${MEDIOS[y.medioPago] || ""}</td>
       <td style="text-align:right;">${formatSoles(y.monto)}</td>
-      <td>${y.estado === "verificado" ? "✓ Verificado" : "⏳ Pendiente"}</td>
+      <td>${labelEstado(y.estado)}</td>
     </tr>`;
   }).join("");
 }
@@ -1750,6 +1754,8 @@ function renderReportePagosBanco() {
     const detalle = vinculados.length
       ? vinculados.map((v) => `<div class="vinculo-item"><span>${escapeHtml(NOMBRES_HERMANOS[v.hermano] || "—")} · ${formatFecha(v.fechaPago)}</span><span style="font-weight:600;">${formatSoles(v.monto)}</span></div>`).join("")
       : `<div class="empty" style="padding:4px 0;">Sin aportes vinculados.</div>`;
+    const capitalFila = p.montoCapital || p.monto;
+    const interesFila = p.monto - capitalFila;
     return `
       <div class="reporte-grupo">
         <div class="reporte-grupo-header">
@@ -1759,6 +1765,7 @@ function renderReportePagosBanco() {
               <span class="tipo-tag" style="color:${t.color};border-color:${t.color};">${t.label}</span>
               <span class="ledger-numero" style="margin-left:8px;">${formatFecha(p.fecha)}${p.fechaVencimiento ? " · Vence " + formatFecha(p.fechaVencimiento) : ""}</span>
             </div>
+            <div class="ledger-numero" style="margin-top:4px;">Capital ${formatSoles(capitalFila)} · Interés/seguro ${formatSoles(interesFila)}</div>
           </div>
           <div style="text-align:right;">
             <div style="font-weight:600;font-size:15px;">${formatSoles(p.monto)}</div>
@@ -1774,7 +1781,7 @@ function renderReportePagosBanco() {
     <div class="hermano-card" style="margin-top:8px;">
       <div class="hermano-nombre">Totales del filtro (${filtrado.length} pago${filtrado.length === 1 ? "" : "s"})</div>
       <div class="hermano-monto">${formatSoles(total)}</div>
-      <div class="hermano-desglose">A capital ${formatSoles(totalCapital)} · Interés/seguro ${formatSoles(totalInteres)} · Vinculado con aportes ${formatSoles(totalVinculadoGlobal)}</div>
+      <div class="hermano-desglose">A capital ${formatSoles(totalCapital)} · <strong>Interés/seguro acumulado ${formatSoles(totalInteres)}</strong> · Vinculado con aportes ${formatSoles(totalVinculadoGlobal)}</div>
     </div>`;
 }
 
@@ -1871,11 +1878,13 @@ function renderAll() {
   // totals yapes — respetan la pestaña activa (Todos / una persona / el propio hermano)
   const yapesParaTotales = hermanoFiltroEfectivo === "todos" ? yapes : yapes.filter((y) => String(y.hermano) === hermanoFiltroEfectivo);
   const verificado = yapesParaTotales.filter((y) => y.estado === "verificado").reduce((s, y) => s + y.monto, 0);
+  const pagadoTotal = yapesParaTotales.filter((y) => y.estado === "pagado").reduce((s, y) => s + y.monto, 0);
   const pendiente = yapesParaTotales.filter((y) => y.estado === "pendiente").reduce((s, y) => s + y.monto, 0);
   const totalReducCuota = yapesParaTotales.filter((y) => y.motivo === "reduccion_cuota" || y.motivo === "prepago").reduce((s, y) => s + y.monto, 0);
   const totalReducPlazo = yapesParaTotales.filter((y) => y.motivo === "reduccion_plazo").reduce((s, y) => s + y.monto, 0);
   const totalMensual = yapesParaTotales.filter((y) => y.motivo === "cuota_mensual" || y.motivo === "cuota").reduce((s, y) => s + y.monto, 0);
   document.getElementById("total-verificado").textContent = formatSoles(verificado);
+  document.getElementById("total-pagado").textContent = formatSoles(pagadoTotal);
   document.getElementById("total-pendiente").textContent = formatSoles(pendiente);
   document.getElementById("total-motivo-cuota").textContent = formatSoles(totalReducCuota);
   document.getElementById("total-motivo-plazo").textContent = formatSoles(totalReducPlazo);
@@ -2188,7 +2197,7 @@ function generarPdfAportes(titulo, subtitulo, filtrado, total, totalVerificado, 
     (CATEGORIAS[y.motivo] || {}).label || y.motivo || "",
     MEDIOS[y.medioPago] || "",
     formatSoles(y.monto),
-    y.estado === "verificado" ? "Verificado" : "Pendiente",
+    y.estado === "pagado" ? "Pagado" : (y.estado === "verificado" ? "Verificado" : "Pendiente"),
   ]);
 
   docPdf.autoTable({
@@ -2243,26 +2252,40 @@ document.getElementById("reporte-banco-pdf-btn").addEventListener("click", () =>
   docPdf.text(`Filtros: ${desde ? formatFecha(desde) : "…"} a ${hasta ? formatFecha(hasta) : "…"}`, 14, 22);
   docPdf.text(`Generado el ${new Date().toLocaleDateString("es-PE")}`, 14, 27);
 
-  const filas = filtrado.map((p) => [
-    p.numeroOperacion || formatNumero(p.numero),
-    formatFecha(p.fecha),
-    (CATEGORIAS[p.tipo] || {}).label || p.tipo || "",
-    formatSoles(p.monto),
-    formatSoles(p.montoCapital || p.monto),
-  ]);
+  let totalVinculadoGlobal = 0;
+  const filas = filtrado.map((p) => {
+    const vinculados = aportesVinculados(p.id);
+    const totalVinc = vinculados.reduce((s, y) => s + y.monto, 0);
+    totalVinculadoGlobal += totalVinc;
+    const interes = p.monto - (p.montoCapital || p.monto);
+    const detalle = vinculados.length
+      ? vinculados.map((v) => `${NOMBRES_HERMANOS[v.hermano] || "—"}: ${formatSoles(v.monto)}`).join(" / ")
+      : "Sin vincular";
+    const diferencia = Math.round((p.monto - totalVinc) * 100) / 100;
+    const cuadra = Math.abs(diferencia) < 0.01 ? "Cuadra" : (diferencia > 0 ? `Falta ${formatSoles(diferencia)}` : `Sobra ${formatSoles(-diferencia)}`);
+    return [
+      p.numeroOperacion || formatNumero(p.numero),
+      formatFecha(p.fecha),
+      (CATEGORIAS[p.tipo] || {}).label || p.tipo || "",
+      formatSoles(p.monto),
+      formatSoles(p.montoCapital || p.monto),
+      formatSoles(interes),
+      detalle,
+      cuadra,
+    ];
+  });
 
   docPdf.autoTable({
     startY: 32,
-    head: [["N° Operación", "Fecha", "Tipo", "Monto", "A capital"]],
+    head: [["N° Operación", "Fecha", "Tipo", "Monto", "A capital", "Interés/seguro", "Aportes vinculados", "Estado"]],
     body: filas,
     foot: [
-      [{ content: `TOTAL (${filtrado.length} registros)`, colSpan: 3 }, formatSoles(total), formatSoles(totalCapital)],
-      [{ content: "Interés/seguro", colSpan: 4 }, formatSoles(totalInteres)],
+      [{ content: `TOTAL (${filtrado.length} registros)`, colSpan: 3 }, formatSoles(total), formatSoles(totalCapital), formatSoles(totalInteres), `Vinculado: ${formatSoles(totalVinculadoGlobal)}`, ""],
     ],
-    styles: { fontSize: 8, cellPadding: 3 },
-    headStyles: { fillColor: [22, 35, 61] },
-    footStyles: { fillColor: [243, 239, 228], textColor: [22, 35, 61], fontStyle: "bold" },
-    columnStyles: { 3: { halign: "right" }, 4: { halign: "right" } },
+    styles: { fontSize: 7, cellPadding: 3 },
+    headStyles: { fillColor: [22, 35, 61], fontSize: 7 },
+    footStyles: { fillColor: [243, 239, 228], textColor: [22, 35, 61], fontStyle: "bold", fontSize: 7 },
+    columnStyles: { 3: { halign: "right" }, 4: { halign: "right" }, 5: { halign: "right" } },
   });
 
   docPdf.save(`pagos_banco_${new Date().toISOString().slice(0, 10)}.pdf`);
@@ -2283,7 +2306,7 @@ function generarLibroBackup() {
       MEDIOS[y.medioPago] || "",
       y.numeroOperacion || "",
       y.monto,
-      y.estado === "verificado" ? "Verificado" : "Pendiente",
+      y.estado === "pagado" ? "Pagado" : (y.estado === "verificado" ? "Verificado" : "Pendiente"),
       y.nota || "",
       y.imagenUrl || "",
     ]);
@@ -2343,13 +2366,19 @@ document.getElementById("verificar-numeros-btn").addEventListener("click", async
       const numero = await siguienteNumero("banco");
       await updateDoc(doc(db, "pagosBanco", p.id), { numero });
     }
-    const total = yapesSinNumero.length + bancoSinNumero.length;
+    // Corrige aportes vinculados a un pago (vínculos hechos antes de que el
+    // estado "Pagado" existiera) que se quedaron con estado desactualizado.
+    const vinculadosSinPagado = yapes.filter((y) => y.pagoBancoId && y.estado !== "pagado");
+    for (const y of vinculadosSinPagado) {
+      await updateDoc(doc(db, "yapes", y.id), { estado: "pagado" });
+    }
+    const total = yapesSinNumero.length + bancoSinNumero.length + vinculadosSinPagado.length;
     btn.textContent = total > 0 ? `✓ ${total} registro(s) actualizados` : "✓ Todo en orden, nada que corregir";
-    setTimeout(() => { btn.textContent = "🔧 Verificar N° faltantes"; btn.disabled = false; }, 3000);
+    setTimeout(() => { btn.textContent = "🔧 Verificar y reparar registros"; btn.disabled = false; }, 3000);
   } catch (e) {
     showError("No se pudo completar la verificación de números.");
     btn.disabled = false;
-    btn.textContent = "🔧 Verificar N° faltantes";
+    btn.textContent = "🔧 Verificar y reparar registros";
   }
 });
 
