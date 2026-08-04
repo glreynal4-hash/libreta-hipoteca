@@ -331,6 +331,7 @@
             <div class="field-col">
               <label class="field-label">Constancia (foto, opcional)</label>
               <input id="yape-imagen" type="file" accept="image/*,application/pdf" />
+              <span id="yape-imagen-hint" style="font-size:11px;color:#3D6B54;"></span>
             </div>
           </div>
           <div class="form-row">
@@ -473,30 +474,58 @@
       <div id="tab-reportes" hidden>
         <div class="tabs" style="margin-bottom:14px;">
           <button class="subtab-btn active" data-subtab="listado" id="subtab-btn-listado">📋 Listado General</button>
-          <button class="subtab-btn" data-subtab="fecha" id="subtab-btn-fecha">📆 Reporte por Fecha</button>
+          <button class="subtab-btn" data-subtab="fecha" id="subtab-btn-fecha">📆 Listado General x Fecha</button>
+          <button class="subtab-btn" data-subtab="banco" id="subtab-btn-banco-reporte">🏦 Pagos Banco</button>
+          <button class="subtab-btn" data-subtab="grafico" id="subtab-btn-grafico">📉 Gráfico</button>
         </div>
 
-        <!-- LISTADO GENERAL -->
+        <!-- LISTADO GENERAL (por mes/año) -->
         <div id="subtab-listado">
           <div class="filtros-row" style="justify-content:space-between;">
             <div style="display:flex;flex-wrap:wrap;gap:6px;">
               <select id="reporte-mes"></select>
               <select id="reporte-anio"></select>
               <select id="reporte-persona"></select>
+              <select id="reporte-tipo"></select>
             </div>
             <button class="export-btn" id="reporte-pdf-btn">📄 Descargar PDF</button>
           </div>
           <div id="reporte-listado-tabla" style="overflow-x:auto;"></div>
         </div>
 
-        <!-- REPORTE POR FECHA -->
+        <!-- LISTADO GENERAL X FECHA -->
         <div id="subtab-fecha" hidden>
-          <div class="filtros-row">
-            <input id="reporte-fecha-desde" type="date" title="Desde" />
-            <input id="reporte-fecha-hasta" type="date" title="Hasta" />
-            <select id="reporte-fecha-persona"></select>
+          <div class="filtros-row" style="justify-content:space-between;">
+            <div style="display:flex;flex-wrap:wrap;gap:6px;">
+              <input id="reporte-fecha-desde" type="date" title="Desde" />
+              <input id="reporte-fecha-hasta" type="date" title="Hasta" />
+              <select id="reporte-fecha-persona"></select>
+              <select id="reporte-fecha-tipo"></select>
+            </div>
+            <button class="export-btn" id="reporte-fecha-pdf-btn">📄 Descargar PDF</button>
           </div>
-          <div id="reporte-fecha-resumen" style="margin-bottom:16px;"></div>
+          <div id="reporte-fecha-tabla" style="overflow-x:auto;"></div>
+        </div>
+
+        <!-- PAGOS BANCO (solo Administrador) -->
+        <div id="subtab-banco-reporte" hidden>
+          <div class="filtros-row" style="justify-content:space-between;">
+            <div style="display:flex;flex-wrap:wrap;gap:6px;">
+              <input id="reporte-banco-desde" type="date" title="Desde" />
+              <input id="reporte-banco-hasta" type="date" title="Hasta" />
+              <select id="reporte-banco-tipo"></select>
+            </div>
+            <button class="export-btn" id="reporte-banco-pdf-btn">📄 Descargar PDF</button>
+          </div>
+          <div id="reporte-banco-tabla" style="overflow-x:auto;"></div>
+        </div>
+
+        <!-- GRÁFICO (solo Administrador) -->
+        <div id="subtab-grafico" hidden>
+          <div class="filtros-row">
+            <input id="reporte-grafico-desde" type="date" title="Desde" />
+            <input id="reporte-grafico-hasta" type="date" title="Hasta" />
+          </div>
           <div class="section-label" id="chart-label">📉 PROGRESO DE LA CUOTA</div>
           <div id="chart-cuota-container" style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px 14px 4px;"></div>
         </div>
@@ -631,6 +660,8 @@ let tabsAbiertas = []; // índices de personas con una pestaña dinámica abiert
 let ultimosYapesFiltrados = [];
 let ultimoBancoFiltrado = [];
 let ultimoReporteListado = { filtrado: [], total: 0, totalVerificado: 0 };
+let ultimoReporteFecha = { filtrado: [], total: 0, totalVerificado: 0 };
+let ultimoReportePagosBanco = { filtrado: [], total: 0, totalCapital: 0, totalInteres: 0 };
 let historialCuota = [];
 let bancoFiltro = { desde: "", hasta: "", numero: "", numOp: "", orden: "fecha_desc" };
 let bancoPagina = 1;
@@ -652,6 +683,8 @@ function aplicarRol() {
   document.getElementById("tab-btn-banco").hidden = esHermano;
   document.getElementById("edit-config-btn").hidden = esHermano;
   document.getElementById("backup-excel-btn").hidden = esHermano;
+  document.getElementById("subtab-btn-banco-reporte").hidden = esHermano;
+  document.getElementById("subtab-btn-grafico").hidden = esHermano;
   document.getElementById("header-title").textContent = esHermano
     ? `Cuenta: ${nombreActual()}`
     : `Administrador: ${nombreActual()}`;
@@ -663,6 +696,13 @@ function aplicarRol() {
     document.getElementById("tab-yapes").hidden = false;
     document.getElementById("tab-banco").hidden = true;
     document.getElementById("tab-reportes").hidden = true;
+    // Si por alguna razón quedaron activas las sub-pestañas restringidas, forzar "Listado General"
+    document.querySelectorAll(".subtab-btn").forEach((b) => b.classList.remove("active"));
+    document.getElementById("subtab-btn-listado").classList.add("active");
+    document.getElementById("subtab-listado").hidden = false;
+    document.getElementById("subtab-fecha").hidden = true;
+    document.getElementById("subtab-banco-reporte").hidden = true;
+    document.getElementById("subtab-grafico").hidden = true;
     document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
     document.querySelector('.tab-btn[data-tab="yapes"]').classList.add("active");
   } else {
@@ -978,6 +1018,7 @@ function editarYape(id) {
   document.getElementById("yape-num-operacion").value = y.numeroOperacion || "";
   document.getElementById("yape-num-cuota").value = y.numeroCuota || "";
   document.getElementById("yape-nota").value = y.nota || "";
+  document.getElementById("yape-imagen-hint").textContent = y.imagenUrl ? "✓ Ya tiene una constancia guardada — déjalo vacío para conservarla" : "";
   const sel = document.getElementById("yape-hermano");
   if (sel) sel.value = y.hermano;
   const btn = document.getElementById("yape-add-btn");
@@ -993,6 +1034,7 @@ document.getElementById("yape-cancelar-edicion").addEventListener("click", () =>
   document.getElementById("yape-num-cuota").value = "";
   document.getElementById("yape-nota").value = "";
   document.getElementById("yape-imagen").value = "";
+  document.getElementById("yape-imagen-hint").textContent = "";
   document.getElementById("yape-add-btn").textContent = "Registrar pago";
   document.getElementById("yape-cancelar-edicion").hidden = true;
 });
@@ -1048,6 +1090,7 @@ document.getElementById("yape-add-btn").addEventListener("click", async () => {
     document.getElementById("yape-num-operacion").value = "";
     document.getElementById("yape-num-cuota").value = "";
     document.getElementById("yape-nota").value = "";
+    document.getElementById("yape-imagen-hint").textContent = "";
     fileInput.value = "";
   } catch (e) {
     showError("No se pudo guardar el pago (revisa Storage/Firestore).");
@@ -1228,15 +1271,21 @@ function ordenarPor(lista, orden) {
 // Dibuja un gráfico simple (SVG, sin librerías) con el progreso de la cuota
 function dibujarGraficoCuota() {
   const cont = document.getElementById("chart-cuota-container");
+  const elDesde = document.getElementById("reporte-grafico-desde");
+  const elHasta = document.getElementById("reporte-grafico-hasta");
+  const desde = elDesde ? elDesde.value : "";
+  const hasta = elHasta ? elHasta.value : "";
+  const historialFiltrado = historialCuota.filter((h) => (!desde || h.fecha >= desde) && (!hasta || h.fecha <= hasta));
+
   // Mientras no haya historial guardado (o si solo cambió una vez), igual
   // mostramos al menos Inicio → Actual con los valores que ya tenemos.
-  if (config.cuotaInicial === config.cuotaActual && historialCuota.length === 0) {
-    cont.innerHTML = `<div class="empty">Aún no hay cambios de cuota registrados. En cuanto edites la "Cuota actual" por primera vez, va a aparecer aquí.</div>`;
+  if (config.cuotaInicial === config.cuotaActual && historialFiltrado.length === 0) {
+    cont.innerHTML = `<div class="empty">Aún no hay cambios de cuota registrados${desde || hasta ? " en ese rango de fechas" : ""}.</div>`;
     return;
   }
 
-  const puntos = historialCuota.length > 0
-    ? [{ fecha: null, valor: config.cuotaInicial, etiqueta: "Inicio" }, ...historialCuota]
+  const puntos = historialFiltrado.length > 0
+    ? [{ fecha: null, valor: config.cuotaInicial, etiqueta: "Inicio" }, ...historialFiltrado]
     : [{ fecha: null, valor: config.cuotaInicial, etiqueta: "Inicio" }, { fecha: null, valor: config.cuotaActual, etiqueta: "Actual" }];
   const w = 620, h = 170, padL = 46, padR = 46, padT = 26, padB = 26;
   const valores = puntos.map((p) => p.valor);
@@ -1267,11 +1316,57 @@ document.querySelectorAll(".subtab-btn").forEach((btn) => {
     const sub = btn.dataset.subtab;
     document.getElementById("subtab-listado").hidden = sub !== "listado";
     document.getElementById("subtab-fecha").hidden = sub !== "fecha";
+    document.getElementById("subtab-banco-reporte").hidden = sub !== "banco";
+    document.getElementById("subtab-grafico").hidden = sub !== "grafico";
     renderAll();
   });
 });
 
+function poblarSelectTipo(sel) {
+  if (sel.options.length === 0) {
+    sel.innerHTML = `<option value="todos">Todos los tipos</option>` +
+      Object.entries({ reduccion_cuota: CATEGORIAS.reduccion_cuota, reduccion_plazo: CATEGORIAS.reduccion_plazo, cuota_mensual: CATEGORIAS.cuota_mensual, otros: CATEGORIAS.otros })
+        .map(([val, c]) => `<option value="${val}">${c.label}</option>`).join("");
+  }
+}
+function coincideTipo(valorGuardado, filtroTipo) {
+  if (filtroTipo === "todos") return true;
+  const alias = { cuota: "reduccion_cuota", prepago: "reduccion_cuota", plazo: "reduccion_plazo" };
+  const normalizado = alias[valorGuardado] || valorGuardado;
+  return normalizado === filtroTipo;
+}
+
 const MESES_NOMBRE = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+
+function construirFilasAportes(filtrado) {
+  return filtrado.map((y) => {
+    const m = CATEGORIAS[y.motivo] || CATEGORIAS.otros;
+    const nombrePersona = rol.tipo === "hermano" ? nombreActual() : (NOMBRES_HERMANOS[y.hermano] || "—");
+    return `<tr>
+      <td>${formatNumero(y.numero)}</td>
+      <td>${formatFecha(y.fechaPago)}</td>
+      <td>${escapeHtml(nombrePersona)}</td>
+      <td>${m.label}</td>
+      <td>${MEDIOS[y.medioPago] || ""}</td>
+      <td style="text-align:right;">${formatSoles(y.monto)}</td>
+      <td>${y.estado === "verificado" ? "✓ Verificado" : "⏳ Pendiente"}</td>
+    </tr>`;
+  }).join("");
+}
+function construirTablaAportesHtml(filtrado) {
+  const total = filtrado.reduce((s, y) => s + y.monto, 0);
+  const totalVerificado = filtrado.filter((y) => y.estado === "verificado").reduce((s, y) => s + y.monto, 0);
+  const filas = construirFilasAportes(filtrado);
+  return `
+    <table class="reporte-table">
+      <thead><tr><th>N°</th><th>Fecha</th><th>Persona</th><th>Motivo</th><th>Medio</th><th style="text-align:right;">Monto</th><th>Estado</th></tr></thead>
+      <tbody>${filas || `<tr><td colspan="7" class="empty">Sin registros para este filtro.</td></tr>`}</tbody>
+      <tfoot>
+        <tr><td colspan="5">TOTAL (${filtrado.length} registro${filtrado.length === 1 ? "" : "s"})</td><td style="text-align:right;">${formatSoles(total)}</td><td></td></tr>
+        <tr><td colspan="5">Verificado</td><td style="text-align:right;">${formatSoles(totalVerificado)}</td><td></td></tr>
+      </tfoot>
+    </table>`;
+}
 
 function renderReporteListado() {
   const selMes = document.getElementById("reporte-mes");
@@ -1295,45 +1390,30 @@ function renderReporteListado() {
     selPersona.value = prevP;
   }
 
+  const selTipo = document.getElementById("reporte-tipo");
+  poblarSelectTipo(selTipo);
+
   const mes = selMes.value || "todos";
   const anio = selAnio.value || "todos";
   const persona = rol.tipo === "hermano" ? String(rol.hermanoIdx) : (selPersona.value || "todos");
+  const tipo = selTipo.value || "todos";
 
   const base = rol.tipo === "hermano" ? yapes.filter((y) => y.hermano === rol.hermanoIdx) : yapes;
   const filtrado = base.filter((y) => {
     if (mes !== "todos" && (!y.fechaPago || y.fechaPago.slice(5, 7) !== mes)) return false;
     if (anio !== "todos" && (!y.fechaPago || y.fechaPago.slice(0, 4) !== anio)) return false;
     if (persona !== "todos" && String(y.hermano) !== persona) return false;
+    if (!coincideTipo(y.motivo, tipo)) return false;
     return true;
   }).sort((a, b) => (a.fechaPago < b.fechaPago ? 1 : a.fechaPago > b.fechaPago ? -1 : 0));
 
-  const total = filtrado.reduce((s, y) => s + y.monto, 0);
-  const totalVerificado = filtrado.filter((y) => y.estado === "verificado").reduce((s, y) => s + y.monto, 0);
-  ultimoReporteListado = { filtrado, total, totalVerificado, mes, anio, persona };
-
-  const filas = filtrado.map((y) => {
-    const m = CATEGORIAS[y.motivo] || CATEGORIAS.otros;
-    const nombrePersona = rol.tipo === "hermano" ? nombreActual() : (NOMBRES_HERMANOS[y.hermano] || "—");
-    return `<tr>
-      <td>${formatNumero(y.numero)}</td>
-      <td>${formatFecha(y.fechaPago)}</td>
-      <td>${escapeHtml(nombrePersona)}</td>
-      <td>${m.label}</td>
-      <td>${MEDIOS[y.medioPago] || ""}</td>
-      <td style="text-align:right;">${formatSoles(y.monto)}</td>
-      <td>${y.estado === "verificado" ? "✓ Verificado" : "⏳ Pendiente"}</td>
-    </tr>`;
-  }).join("");
-
-  document.getElementById("reporte-listado-tabla").innerHTML = `
-    <table class="reporte-table">
-      <thead><tr><th>N°</th><th>Fecha</th><th>Persona</th><th>Motivo</th><th>Medio</th><th style="text-align:right;">Monto</th><th>Estado</th></tr></thead>
-      <tbody>${filas || `<tr><td colspan="7" class="empty">Sin registros para este filtro.</td></tr>`}</tbody>
-      <tfoot>
-        <tr><td colspan="5">TOTAL (${filtrado.length} registro${filtrado.length === 1 ? "" : "s"})</td><td style="text-align:right;">${formatSoles(total)}</td><td></td></tr>
-        <tr><td colspan="5">Verificado</td><td style="text-align:right;">${formatSoles(totalVerificado)}</td><td></td></tr>
-      </tfoot>
-    </table>`;
+  ultimoReporteListado = {
+    filtrado,
+    total: filtrado.reduce((s, y) => s + y.monto, 0),
+    totalVerificado: filtrado.filter((y) => y.estado === "verificado").reduce((s, y) => s + y.monto, 0),
+    mes, anio, persona, tipo,
+  };
+  document.getElementById("reporte-listado-tabla").innerHTML = construirTablaAportesHtml(filtrado);
 }
 
 function renderReporteFecha() {
@@ -1346,32 +1426,88 @@ function renderReporteFecha() {
     selPersona.innerHTML = `<option value="todos">Todas las personas</option>` + NOMBRES_HERMANOS.map((n, idx) => `<option value="${idx}">${escapeHtml(n)}</option>`).join("");
     selPersona.value = prevP;
   }
+  const selTipo = document.getElementById("reporte-fecha-tipo");
+  poblarSelectTipo(selTipo);
 
   const desde = document.getElementById("reporte-fecha-desde").value;
   const hasta = document.getElementById("reporte-fecha-hasta").value;
   const persona = rol.tipo === "hermano" ? String(rol.hermanoIdx) : (selPersona.value || "todos");
+  const tipo = selTipo.value || "todos";
 
+  // Como fechaPago se guarda solo como AAAA-MM-DD (sin hora), comparar con
+  // "<= hasta" ya incluye el día completo de "hasta" automáticamente.
   const base = rol.tipo === "hermano" ? yapes.filter((y) => y.hermano === rol.hermanoIdx) : yapes;
   const filtrado = base.filter((y) => {
     if (desde && y.fechaPago < desde) return false;
     if (hasta && y.fechaPago > hasta) return false;
     if (persona !== "todos" && String(y.hermano) !== persona) return false;
+    if (!coincideTipo(y.motivo, tipo)) return false;
     return true;
-  });
-  const total = filtrado.reduce((s, y) => s + y.monto, 0);
+  }).sort((a, b) => (a.fechaPago < b.fechaPago ? 1 : a.fechaPago > b.fechaPago ? -1 : 0));
 
-  document.getElementById("reporte-fecha-resumen").innerHTML = `
-    <div class="hermano-card">
-      <div class="hermano-nombre">Total en el rango seleccionado</div>
-      <div class="hermano-monto">${formatSoles(total)}</div>
-      <div class="hermano-desglose">${filtrado.length} registro(s)${desde || hasta ? " · " + (desde ? formatFecha(desde) : "…") + " a " + (hasta ? formatFecha(hasta) : "…") : ""}</div>
-    </div>`;
+  ultimoReporteFecha = {
+    filtrado,
+    total: filtrado.reduce((s, y) => s + y.monto, 0),
+    totalVerificado: filtrado.filter((y) => y.estado === "verificado").reduce((s, y) => s + y.monto, 0),
+    desde, hasta, persona, tipo,
+  };
+  document.getElementById("reporte-fecha-tabla").innerHTML = construirTablaAportesHtml(filtrado);
 }
-["reporte-mes", "reporte-anio", "reporte-persona"].forEach((id) => {
+
+function renderReportePagosBanco() {
+  const selTipo = document.getElementById("reporte-banco-tipo");
+  poblarSelectTipo(selTipo);
+  const desde = document.getElementById("reporte-banco-desde").value;
+  const hasta = document.getElementById("reporte-banco-hasta").value;
+  const tipo = selTipo.value || "todos";
+
+  const filtrado = pagosBanco.filter((p) => {
+    if (desde && p.fecha < desde) return false;
+    if (hasta && p.fecha > hasta) return false;
+    if (!coincideTipo(p.tipo, tipo)) return false;
+    return true;
+  }).sort((a, b) => (a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : 0));
+
+  const total = filtrado.reduce((s, p) => s + p.monto, 0);
+  const totalCapital = filtrado.reduce((s, p) => s + (p.montoCapital || p.monto), 0);
+  const totalInteres = filtrado.reduce((s, p) => s + (p.montoCapital ? p.monto - p.montoCapital : 0), 0);
+  ultimoReportePagosBanco = { filtrado, total, totalCapital, totalInteres, desde, hasta, tipo };
+
+  const filas = filtrado.map((p) => {
+    const t = CATEGORIAS[p.tipo] || CATEGORIAS.otros;
+    return `<tr>
+      <td>${formatNumero(p.numero)}</td>
+      <td>${formatFecha(p.fecha)}</td>
+      <td>${t.label}</td>
+      <td style="text-align:right;">${formatSoles(p.monto)}</td>
+      <td style="text-align:right;">${formatSoles(p.montoCapital || p.monto)}</td>
+      <td>${p.numeroOperacion || ""}</td>
+      <td>${escapeHtml(p.nota || "")}</td>
+    </tr>`;
+  }).join("");
+
+  document.getElementById("reporte-banco-tabla").innerHTML = `
+    <table class="reporte-table">
+      <thead><tr><th>N°</th><th>Fecha</th><th>Tipo</th><th style="text-align:right;">Monto</th><th style="text-align:right;">A capital</th><th>N° Operación</th><th>Nota</th></tr></thead>
+      <tbody>${filas || `<tr><td colspan="7" class="empty">Sin registros para este filtro.</td></tr>`}</tbody>
+      <tfoot>
+        <tr><td colspan="3">TOTAL (${filtrado.length} registro${filtrado.length === 1 ? "" : "s"})</td><td style="text-align:right;">${formatSoles(total)}</td><td style="text-align:right;">${formatSoles(totalCapital)}</td><td colspan="2"></td></tr>
+        <tr><td colspan="3">Interés/seguro</td><td colspan="2" style="text-align:right;">${formatSoles(totalInteres)}</td><td colspan="2"></td></tr>
+      </tfoot>
+    </table>`;
+}
+
+["reporte-mes", "reporte-anio", "reporte-persona", "reporte-tipo"].forEach((id) => {
   document.getElementById(id).addEventListener("change", renderReporteListado);
 });
-["reporte-fecha-desde", "reporte-fecha-hasta", "reporte-fecha-persona"].forEach((id) => {
+["reporte-fecha-desde", "reporte-fecha-hasta", "reporte-fecha-persona", "reporte-fecha-tipo"].forEach((id) => {
   document.getElementById(id).addEventListener("change", renderReporteFecha);
+});
+["reporte-banco-desde", "reporte-banco-hasta", "reporte-banco-tipo"].forEach((id) => {
+  document.getElementById(id).addEventListener("change", renderReportePagosBanco);
+});
+["reporte-grafico-desde", "reporte-grafico-hasta"].forEach((id) => {
+  document.getElementById(id).addEventListener("change", () => dibujarGraficoCuota());
 });
 
 function renderAll() {
@@ -1652,6 +1788,7 @@ function renderAll() {
   dibujarGraficoCuota();
   renderReporteListado();
   renderReporteFecha();
+  if (rol.tipo !== "hermano") renderReportePagosBanco();
 }
 
 // event delegation for ledger buttons
@@ -1700,18 +1837,13 @@ function autoAnchoColumnas(filas) {
   return anchos.map((wch) => ({ wch }));
 }
 
-document.getElementById("reporte-pdf-btn").addEventListener("click", () => {
+function generarPdfAportes(titulo, subtitulo, filtrado, total, totalVerificado, nombreArchivo) {
   const { jsPDF } = window.jspdf;
   const docPdf = new jsPDF();
-  const { filtrado, total, totalVerificado, mes, anio, persona } = ultimoReporteListado;
-
   docPdf.setFontSize(14);
-  docPdf.text("Libreta Hipoteca — Listado General de Aportes", 14, 16);
+  docPdf.text(titulo, 14, 16);
   docPdf.setFontSize(9);
-  const nombreMes = mes === "todos" ? "Todos los meses" : `${mes} - ${MESES_NOMBRE[Number(mes) - 1]}`;
-  const nombreAnio = anio === "todos" ? "Todos los años" : anio;
-  const nombrePersonaFiltro = persona === "todos" ? "Todas las personas" : (NOMBRES_HERMANOS[Number(persona)] || "");
-  docPdf.text(`Filtros: ${nombreMes} · ${nombreAnio} · ${nombrePersonaFiltro}`, 14, 22);
+  docPdf.text(subtitulo, 14, 22);
   docPdf.text(`Generado el ${new Date().toLocaleDateString("es-PE")}`, 14, 27);
 
   const filas = filtrado.map((y) => [
@@ -1738,7 +1870,68 @@ document.getElementById("reporte-pdf-btn").addEventListener("click", () => {
     columnStyles: { 5: { halign: "right" } },
   });
 
-  docPdf.save(`listado_aportes_${new Date().toISOString().slice(0, 10)}.pdf`);
+  docPdf.save(nombreArchivo);
+}
+
+document.getElementById("reporte-pdf-btn").addEventListener("click", () => {
+  const { filtrado, total, totalVerificado, mes, anio, persona } = ultimoReporteListado;
+  const nombreMes = mes === "todos" ? "Todos los meses" : `${mes} - ${MESES_NOMBRE[Number(mes) - 1]}`;
+  const nombreAnio = anio === "todos" ? "Todos los años" : anio;
+  const nombrePersonaFiltro = persona === "todos" ? "Todas las personas" : (NOMBRES_HERMANOS[Number(persona)] || "");
+  generarPdfAportes(
+    "Libreta Hipoteca — Listado General de Aportes",
+    `Filtros: ${nombreMes} · ${nombreAnio} · ${nombrePersonaFiltro}`,
+    filtrado, total, totalVerificado,
+    `listado_aportes_${new Date().toISOString().slice(0, 10)}.pdf`
+  );
+});
+
+document.getElementById("reporte-fecha-pdf-btn").addEventListener("click", () => {
+  const { filtrado, total, totalVerificado, desde, hasta, persona } = ultimoReporteFecha;
+  const nombrePersonaFiltro = persona === "todos" ? "Todas las personas" : (NOMBRES_HERMANOS[Number(persona)] || "");
+  generarPdfAportes(
+    "Libreta Hipoteca — Listado General de Aportes x Fecha",
+    `Filtros: ${desde ? formatFecha(desde) : "…"} a ${hasta ? formatFecha(hasta) : "…"} · ${nombrePersonaFiltro}`,
+    filtrado, total, totalVerificado,
+    `listado_aportes_fecha_${new Date().toISOString().slice(0, 10)}.pdf`
+  );
+});
+
+document.getElementById("reporte-banco-pdf-btn").addEventListener("click", () => {
+  const { jsPDF } = window.jspdf;
+  const docPdf = new jsPDF();
+  const { filtrado, total, totalCapital, totalInteres, desde, hasta } = ultimoReportePagosBanco;
+
+  docPdf.setFontSize(14);
+  docPdf.text("Libreta Hipoteca — Pagos al Banco", 14, 16);
+  docPdf.setFontSize(9);
+  docPdf.text(`Filtros: ${desde ? formatFecha(desde) : "…"} a ${hasta ? formatFecha(hasta) : "…"}`, 14, 22);
+  docPdf.text(`Generado el ${new Date().toLocaleDateString("es-PE")}`, 14, 27);
+
+  const filas = filtrado.map((p) => [
+    formatNumero(p.numero),
+    formatFecha(p.fecha),
+    (CATEGORIAS[p.tipo] || {}).label || p.tipo || "",
+    formatSoles(p.monto),
+    formatSoles(p.montoCapital || p.monto),
+    p.numeroOperacion || "",
+  ]);
+
+  docPdf.autoTable({
+    startY: 32,
+    head: [["N°", "Fecha", "Tipo", "Monto", "A capital", "N° Operación"]],
+    body: filas,
+    foot: [
+      [{ content: `TOTAL (${filtrado.length} registros)`, colSpan: 3 }, formatSoles(total), formatSoles(totalCapital), ""],
+      [{ content: "Interés/seguro", colSpan: 4 }, formatSoles(totalInteres), ""],
+    ],
+    styles: { fontSize: 8, cellPadding: 3 },
+    headStyles: { fillColor: [22, 35, 61] },
+    footStyles: { fillColor: [243, 239, 228], textColor: [22, 35, 61], fontStyle: "bold" },
+    columnStyles: { 3: { halign: "right" }, 4: { halign: "right" } },
+  });
+
+  docPdf.save(`pagos_banco_${new Date().toISOString().slice(0, 10)}.pdf`);
 });
 
 function generarLibroBackup() {
