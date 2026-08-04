@@ -144,6 +144,16 @@
   .aviso-pendientes::before{content:"⚠️";font-size:18px;flex-shrink:0;}
   .export-btn{background:transparent;border:1px solid var(--brass);color:var(--brass);border-radius:6px;
     font-family:'IBM Plex Mono',monospace;font-size:11px;padding:5px 10px;cursor:pointer;}
+  .vinculo-detalle{margin-top:8px;border-top:1px dashed var(--border);padding-top:8px;}
+  .vinculo-summary{cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted);
+    list-style:none;}
+  .vinculo-summary::-webkit-details-marker{display:none;}
+  .vinculo-lista{display:flex;flex-direction:column;gap:6px;margin:8px 0;}
+  .vinculo-item{display:flex;justify-content:space-between;align-items:center;background:var(--card);
+    border-radius:6px;padding:6px 10px;font-size:12px;}
+  .vinculo-agregar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
+  .vinculo-select{font-size:12px;padding:6px 8px;border-radius:5px;border:1px solid #D3CBB8;background:#fff;
+    color:var(--ink);flex:1;min-width:180px;}
   .export-btn:hover{background:var(--brass);color:#fff;}
   .modal-overlay{position:fixed;inset:0;background:rgba(22,35,61,.45);display:flex;align-items:center;
     justify-content:center;z-index:1000;padding:20px;}
@@ -231,6 +241,7 @@
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
           <button class="cambiar-rol" id="cambiar-rol-btn">Cerrar sesión</button>
           <button class="export-btn" id="backup-excel-btn" hidden>💾 Respaldo Excel</button>
+          <button class="export-btn" id="verificar-numeros-btn" hidden>🔧 Verificar N° faltantes</button>
         </div>
       </div>
 
@@ -255,7 +266,49 @@
         <button class="edit-btn" id="edit-config-btn">Editar</button>
       </div>
 
+      <div id="cronograma-original-box" class="filtros-row" hidden style="margin-top:-8px;margin-bottom:16px;">
+        <div class="field-col">
+          <label class="field-label">Interés original (cronograma inicial, S/)</label>
+          <input id="interes-original-edit" type="number" step="0.01" />
+        </div>
+        <div class="field-col">
+          <label class="field-label">Seguro original (cronograma inicial, S/)</label>
+          <input id="seguro-original-edit" type="number" step="0.01" />
+        </div>
+      </div>
+
       <div id="aviso-pendientes" class="aviso-pendientes" hidden></div>
+
+      <div id="ahorro-real-card" class="hermano-card" style="margin-bottom:16px;" hidden>
+        <div class="hermano-nombre">💰 Ahorro real confirmado (según cronogramas de Interbank)</div>
+        <div class="hermano-monto" id="ahorro-real-monto"></div>
+        <div class="hermano-desglose" id="ahorro-real-detalle"></div>
+      </div>
+
+      <div id="actualizar-cronograma-box" class="form" style="margin-bottom:16px;" hidden>
+        <div class="section-label" style="margin-top:0;">📈 ACTUALIZAR CRONOGRAMA (tras un nuevo prepago)</div>
+        <div class="form-row">
+          <div class="field-col">
+            <label class="field-label">Fecha del cronograma</label>
+            <input id="cronograma-fecha" type="date" />
+          </div>
+          <div class="field-col">
+            <label class="field-label">Interés total (S/)</label>
+            <input id="cronograma-interes" type="number" step="0.01" placeholder="Ej. 44661.07" />
+          </div>
+          <div class="field-col">
+            <label class="field-label">Seguro Desgravamen total (S/)</label>
+            <input id="cronograma-seguro" type="number" step="0.01" placeholder="Ej. 1725.79" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="field-col">
+            <label class="field-label">Nueva cuota a pagar (S/)</label>
+            <input id="cronograma-cuota" type="number" step="0.01" placeholder="Ej. 1080.88" />
+          </div>
+        </div>
+        <button class="add-btn" id="cronograma-add-btn">Guardar actualización de cronograma</button>
+      </div>
 
       <div class="tabs" id="tabs-row">
         <button class="tab-btn active" data-tab="yapes" id="tab-btn-yapes">📊 Todos los Aportes</button>
@@ -327,6 +380,10 @@
             <div class="field-col">
               <label class="field-label">Fecha en que pagaste</label>
               <input id="yape-fecha-pago" type="date" />
+            </div>
+            <div class="field-col">
+              <label class="field-label">Mes que corresponde</label>
+              <input id="yape-mes-corresponde" type="month" />
             </div>
             <div class="field-col">
               <label class="field-label">Constancia (foto, opcional)</label>
@@ -409,13 +466,22 @@
         <div class="section-label">➕ REGISTRAR PAGO AL BANCO</div>
         <div class="form">
           <div class="form-row">
-            <input id="banco-fecha" type="date" />
+            <div class="field-col">
+              <label class="field-label">Fecha de pago</label>
+              <input id="banco-fecha" type="date" />
+            </div>
+            <div class="field-col">
+              <label class="field-label">Fecha de vencimiento</label>
+              <input id="banco-fecha-vencimiento" type="date" />
+            </div>
             <select id="banco-tipo">
               <option value="reduccion_cuota">Prepago - Reducción de Cuota</option>
               <option value="reduccion_plazo">Prepago - Reducción de Plazo</option>
               <option value="cuota_mensual">Pago de Cuota Mensual</option>
               <option value="otros">Otros</option>
             </select>
+          </div>
+          <div class="form-row">
             <input id="banco-monto" type="number" placeholder="Monto pagado (S/)" />
           </div>
           <div class="form-row">
@@ -646,7 +712,7 @@ function formatNumero(n) {
   return n ? String(n).padStart(5, "0") : "—";
 }
 
-const DEFAULT_CONFIG = { hermanos: ["Cristian Reyna", "Marlon Reyna"], cuotaInicial: 1131, cuotaActual: 1080 };
+const DEFAULT_CONFIG = { hermanos: ["Cristian Reyna", "Marlon Reyna"], cuotaInicial: 1131.08, cuotaActual: 1080.88, interesOriginal: 45304.19, seguroOriginal: 1750.56 };
 let config = DEFAULT_CONFIG;
 let yapes = [];
 let pagosBanco = [];
@@ -662,6 +728,7 @@ let ultimoBancoFiltrado = [];
 let ultimoReporteListado = { filtrado: [], total: 0, totalVerificado: 0 };
 let ultimoReporteFecha = { filtrado: [], total: 0, totalVerificado: 0 };
 let ultimoReportePagosBanco = { filtrado: [], total: 0, totalCapital: 0, totalInteres: 0 };
+let historialCronograma = [];
 let historialCuota = [];
 let bancoFiltro = { desde: "", hasta: "", numero: "", numOp: "", orden: "fecha_desc" };
 let bancoPagina = 1;
@@ -683,8 +750,10 @@ function aplicarRol() {
   document.getElementById("tab-btn-banco").hidden = esHermano;
   document.getElementById("edit-config-btn").hidden = esHermano;
   document.getElementById("backup-excel-btn").hidden = esHermano;
+  document.getElementById("verificar-numeros-btn").hidden = esHermano;
   document.getElementById("subtab-btn-banco-reporte").hidden = esHermano;
   document.getElementById("subtab-btn-grafico").hidden = esHermano;
+  document.getElementById("actualizar-cronograma-box").hidden = esHermano;
   document.getElementById("header-title").textContent = esHermano
     ? `Cuenta: ${nombreActual()}`
     : `Administrador: ${nombreActual()}`;
@@ -851,6 +920,7 @@ async function initApp() {
   }
 
   document.getElementById("yape-fecha-pago").value = new Date().toISOString().slice(0, 10);
+  document.getElementById("yape-mes-corresponde").value = new Date().toISOString().slice(0, 7);
   document.getElementById("banco-fecha").value = new Date().toISOString().slice(0, 10);
 
   try {
@@ -872,6 +942,11 @@ async function initApp() {
 
   onSnapshot(query(collection(db, "historialCuota"), orderBy("fecha", "asc")), (snap) => {
     historialCuota = snap.docs.map((d) => d.data());
+    renderAll();
+  }, () => {});
+
+  onSnapshot(query(collection(db, "historialCronograma"), orderBy("fecha", "asc")), (snap) => {
+    historialCronograma = snap.docs.map((d) => d.data());
     renderAll();
   }, () => {});
 
@@ -985,14 +1060,27 @@ function renderTabsDinamicas() {
   }
 }
 
+// El "mes que corresponde" sigue a la fecha de pago automáticamente, salvo
+// que el usuario ya lo haya tocado a mano (ej. pagó en agosto lo de julio).
+let mesCorrespondeTocado = false;
+document.getElementById("yape-mes-corresponde").addEventListener("input", () => { mesCorrespondeTocado = true; });
+document.getElementById("yape-fecha-pago").addEventListener("change", (e) => {
+  if (!mesCorrespondeTocado) {
+    document.getElementById("yape-mes-corresponde").value = e.target.value.slice(0, 7);
+  }
+});
+
 // ---------- CONFIG EDIT ----------
 document.getElementById("edit-config-btn").addEventListener("click", async () => {
   editingConfig = !editingConfig;
+  document.getElementById("cronograma-original-box").hidden = !editingConfig;
   if (!editingConfig) {
     const nuevoInicial = Number(document.getElementById("cuota-inicial-edit").value) || config.cuotaInicial;
     const nuevoActual = Number(document.getElementById("cuota-actual-edit").value) || config.cuotaActual;
+    const nuevoInteresOriginal = Number(document.getElementById("interes-original-edit").value) || config.interesOriginal;
+    const nuevoSeguroOriginal = Number(document.getElementById("seguro-original-edit").value) || config.seguroOriginal;
     const cambioCuota = nuevoActual !== config.cuotaActual;
-    config = { ...config, cuotaInicial: nuevoInicial, cuotaActual: nuevoActual };
+    config = { ...config, cuotaInicial: nuevoInicial, cuotaActual: nuevoActual, interesOriginal: nuevoInteresOriginal, seguroOriginal: nuevoSeguroOriginal };
     try {
       await setDoc(doc(db, "config", "main"), config);
       if (cambioCuota) {
@@ -1015,6 +1103,8 @@ function editarYape(id) {
   document.getElementById("yape-medio").value = y.medioPago || "yape";
   document.getElementById("yape-monto").value = y.monto;
   document.getElementById("yape-fecha-pago").value = y.fechaPago;
+  document.getElementById("yape-mes-corresponde").value = y.mesCorresponde || y.fechaPago.slice(0, 7);
+  mesCorrespondeTocado = true;
   document.getElementById("yape-num-operacion").value = y.numeroOperacion || "";
   document.getElementById("yape-num-cuota").value = y.numeroCuota || "";
   document.getElementById("yape-nota").value = y.nota || "";
@@ -1035,6 +1125,8 @@ document.getElementById("yape-cancelar-edicion").addEventListener("click", () =>
   document.getElementById("yape-nota").value = "";
   document.getElementById("yape-imagen").value = "";
   document.getElementById("yape-imagen-hint").textContent = "";
+  document.getElementById("yape-mes-corresponde").value = document.getElementById("yape-fecha-pago").value.slice(0, 7);
+  mesCorrespondeTocado = false;
   document.getElementById("yape-add-btn").textContent = "Registrar pago";
   document.getElementById("yape-cancelar-edicion").hidden = true;
 });
@@ -1071,6 +1163,7 @@ document.getElementById("yape-add-btn").addEventListener("click", async () => {
       medioPago: document.getElementById("yape-medio").value,
       motivo: document.getElementById("yape-motivo").value,
       fechaPago,
+      mesCorresponde: document.getElementById("yape-mes-corresponde").value || fechaPago.slice(0, 7),
       numeroOperacion: document.getElementById("yape-num-operacion").value.trim(),
       numeroCuota: document.getElementById("yape-num-cuota").value.trim(),
       monto,
@@ -1091,6 +1184,8 @@ document.getElementById("yape-add-btn").addEventListener("click", async () => {
     document.getElementById("yape-num-cuota").value = "";
     document.getElementById("yape-nota").value = "";
     document.getElementById("yape-imagen-hint").textContent = "";
+    document.getElementById("yape-mes-corresponde").value = document.getElementById("yape-fecha-pago").value.slice(0, 7);
+    mesCorrespondeTocado = false;
     fileInput.value = "";
   } catch (e) {
     showError("No se pudo guardar el pago (revisa Storage/Firestore).");
@@ -1108,6 +1203,7 @@ function editarBanco(id) {
   if (!p) return;
   bancoEditId = id;
   document.getElementById("banco-fecha").value = p.fecha;
+  document.getElementById("banco-fecha-vencimiento").value = p.fechaVencimiento || "";
   document.getElementById("banco-tipo").value = p.tipo === "cuota" ? "reduccion_cuota" : (p.tipo === "plazo" ? "reduccion_plazo" : p.tipo);
   document.getElementById("banco-monto").value = p.monto;
   document.getElementById("banco-capital").value = p.montoCapital ?? "";
@@ -1126,6 +1222,7 @@ document.getElementById("banco-cancelar-edicion").addEventListener("click", () =
   bancoEditId = null;
   document.getElementById("banco-monto").value = "";
   document.getElementById("banco-capital").value = "";
+  document.getElementById("banco-fecha-vencimiento").value = "";
   document.getElementById("banco-num-operacion").value = "";
   document.getElementById("banco-num-cuota").value = "";
   document.getElementById("banco-nota").value = "";
@@ -1173,6 +1270,7 @@ document.getElementById("banco-add-btn").addEventListener("click", async () => {
     }
     const datos = {
       fecha,
+      fechaVencimiento: document.getElementById("banco-fecha-vencimiento").value || null,
       monto,
       tipo: document.getElementById("banco-tipo").value,
       montoCapital: capitalVal ? Number(capitalVal) : null,
@@ -1194,6 +1292,7 @@ document.getElementById("banco-add-btn").addEventListener("click", async () => {
     }
     document.getElementById("banco-monto").value = "";
     document.getElementById("banco-capital").value = "";
+    document.getElementById("banco-fecha-vencimiento").value = "";
     document.getElementById("banco-num-operacion").value = "";
     document.getElementById("banco-num-cuota").value = "";
     document.getElementById("banco-nota").value = "";
@@ -1269,6 +1368,48 @@ function ordenarPor(lista, orden) {
   return arr;
 }
 // Dibuja un gráfico simple (SVG, sin librerías) con el progreso de la cuota
+document.getElementById("cronograma-add-btn").addEventListener("click", async () => {
+  const fecha = document.getElementById("cronograma-fecha").value;
+  const interesTotal = Number(document.getElementById("cronograma-interes").value);
+  const seguroTotal = Number(document.getElementById("cronograma-seguro").value);
+  const cuotaNueva = Number(document.getElementById("cronograma-cuota").value);
+  if (!fecha || !interesTotal || !seguroTotal || !cuotaNueva) {
+    showError("Completa los 4 campos del cronograma antes de guardar.");
+    return;
+  }
+  const btn = document.getElementById("cronograma-add-btn");
+  btn.disabled = true;
+  btn.textContent = "Guardando…";
+  try {
+    await addDoc(collection(db, "historialCronograma"), { fecha, interesTotal, seguroTotal, cuotaNueva });
+    if (cuotaNueva !== config.cuotaActual) {
+      config = { ...config, cuotaActual: cuotaNueva };
+      await setDoc(doc(db, "config", "main"), config);
+      await addDoc(collection(db, "historialCuota"), { fecha, valor: cuotaNueva });
+    }
+    document.getElementById("cronograma-interes").value = "";
+    document.getElementById("cronograma-seguro").value = "";
+    document.getElementById("cronograma-cuota").value = "";
+  } catch (e) {
+    showError("No se pudo guardar la actualización de cronograma.");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Guardar actualización de cronograma";
+  }
+});
+
+function renderAhorroReal() {
+  const card = document.getElementById("ahorro-real-card");
+  if (historialCronograma.length === 0) { card.hidden = true; return; }
+  const ultimo = historialCronograma[historialCronograma.length - 1];
+  const original = (config.interesOriginal || 0) + (config.seguroOriginal || 0);
+  const actual = (ultimo.interesTotal || 0) + (ultimo.seguroTotal || 0);
+  const ahorro = original - actual;
+  card.hidden = false;
+  document.getElementById("ahorro-real-monto").textContent = formatSoles(ahorro);
+  document.getElementById("ahorro-real-detalle").textContent = `Según cronograma del ${formatFecha(ultimo.fecha)} · Interés+Seguro original S/${original.toFixed(2)} vs. actual S/${actual.toFixed(2)}`;
+}
+
 function dibujarGraficoCuota() {
   const cont = document.getElementById("chart-cuota-container");
   const elDesde = document.getElementById("reporte-grafico-desde");
@@ -1329,6 +1470,21 @@ function poblarSelectTipo(sel) {
         .map(([val, c]) => `<option value="${val}">${c.label}</option>`).join("");
   }
 }
+// Resuelve a qué mes corresponde un aporte: el que el usuario marcó
+// explícitamente, o si no marcó nada, el mes de la fecha real de pago.
+// Aportes ya vinculados a un pago al banco específico
+function aportesVinculados(pagoId) {
+  return yapes.filter((y) => y.pagoBancoId === pagoId);
+}
+// Aportes verificados que aún no están vinculados a ningún pago (sueltos)
+function aportesDisponiblesParaVincular() {
+  return yapes.filter((y) => y.estado === "verificado" && !y.pagoBancoId);
+}
+
+function periodoDe(y) {
+  return y.mesCorresponde || (y.fechaPago ? y.fechaPago.slice(0, 7) : "");
+}
+
 function coincideTipo(valorGuardado, filtroTipo) {
   if (filtroTipo === "todos") return true;
   const alias = { cuota: "reduccion_cuota", prepago: "reduccion_cuota", plazo: "reduccion_plazo" };
@@ -1343,7 +1499,7 @@ function construirFilasAportes(filtrado) {
     const m = CATEGORIAS[y.motivo] || CATEGORIAS.otros;
     const nombrePersona = rol.tipo === "hermano" ? nombreActual() : (NOMBRES_HERMANOS[y.hermano] || "—");
     return `<tr>
-      <td>${formatNumero(y.numero)}</td>
+      <td>${escapeHtml(y.numeroOperacion || formatNumero(y.numero))}</td>
       <td>${formatFecha(y.fechaPago)}</td>
       <td>${escapeHtml(nombrePersona)}</td>
       <td>${m.label}</td>
@@ -1359,7 +1515,7 @@ function construirTablaAportesHtml(filtrado) {
   const filas = construirFilasAportes(filtrado);
   return `
     <table class="reporte-table">
-      <thead><tr><th>N°</th><th>Fecha</th><th>Persona</th><th>Motivo</th><th>Medio</th><th style="text-align:right;">Monto</th><th>Estado</th></tr></thead>
+      <thead><tr><th>N° Operación</th><th>Fecha</th><th>Persona</th><th>Motivo</th><th>Medio</th><th style="text-align:right;">Monto</th><th>Estado</th></tr></thead>
       <tbody>${filas || `<tr><td colspan="7" class="empty">Sin registros para este filtro.</td></tr>`}</tbody>
       <tfoot>
         <tr><td colspan="5">TOTAL (${filtrado.length} registro${filtrado.length === 1 ? "" : "s"})</td><td style="text-align:right;">${formatSoles(total)}</td><td></td></tr>
@@ -1375,7 +1531,7 @@ function renderReporteListado() {
       MESES_NOMBRE.map((m, i) => `<option value="${String(i + 1).padStart(2, "0")}">${String(i + 1).padStart(2, "0")} - ${m}</option>`).join("");
   }
   const selAnio = document.getElementById("reporte-anio");
-  const aniosDisponibles = Array.from(new Set(yapes.map((y) => y.fechaPago && y.fechaPago.slice(0, 4)).filter(Boolean))).sort();
+  const aniosDisponibles = Array.from(new Set(yapes.map((y) => periodoDe(y).slice(0, 4)).filter(Boolean))).sort();
   const prevAnio = selAnio.value || "todos";
   selAnio.innerHTML = `<option value="todos">Todos los años</option>` + aniosDisponibles.map((a) => `<option value="${a}">${a}</option>`).join("");
   selAnio.value = aniosDisponibles.includes(prevAnio) ? prevAnio : "todos";
@@ -1400,8 +1556,9 @@ function renderReporteListado() {
 
   const base = rol.tipo === "hermano" ? yapes.filter((y) => y.hermano === rol.hermanoIdx) : yapes;
   const filtrado = base.filter((y) => {
-    if (mes !== "todos" && (!y.fechaPago || y.fechaPago.slice(5, 7) !== mes)) return false;
-    if (anio !== "todos" && (!y.fechaPago || y.fechaPago.slice(0, 4) !== anio)) return false;
+    const periodo = periodoDe(y);
+    if (mes !== "todos" && periodo.slice(5, 7) !== mes) return false;
+    if (anio !== "todos" && periodo.slice(0, 4) !== anio) return false;
     if (persona !== "todos" && String(y.hermano) !== persona) return false;
     if (!coincideTipo(y.motivo, tipo)) return false;
     return true;
@@ -1476,23 +1633,22 @@ function renderReportePagosBanco() {
   const filas = filtrado.map((p) => {
     const t = CATEGORIAS[p.tipo] || CATEGORIAS.otros;
     return `<tr>
-      <td>${formatNumero(p.numero)}</td>
+      <td>${escapeHtml(p.numeroOperacion || formatNumero(p.numero))}</td>
       <td>${formatFecha(p.fecha)}</td>
       <td>${t.label}</td>
       <td style="text-align:right;">${formatSoles(p.monto)}</td>
       <td style="text-align:right;">${formatSoles(p.montoCapital || p.monto)}</td>
-      <td>${p.numeroOperacion || ""}</td>
       <td>${escapeHtml(p.nota || "")}</td>
     </tr>`;
   }).join("");
 
   document.getElementById("reporte-banco-tabla").innerHTML = `
     <table class="reporte-table">
-      <thead><tr><th>N°</th><th>Fecha</th><th>Tipo</th><th style="text-align:right;">Monto</th><th style="text-align:right;">A capital</th><th>N° Operación</th><th>Nota</th></tr></thead>
-      <tbody>${filas || `<tr><td colspan="7" class="empty">Sin registros para este filtro.</td></tr>`}</tbody>
+      <thead><tr><th>N° Operación</th><th>Fecha</th><th>Tipo</th><th style="text-align:right;">Monto</th><th style="text-align:right;">A capital</th><th>Nota</th></tr></thead>
+      <tbody>${filas || `<tr><td colspan="6" class="empty">Sin registros para este filtro.</td></tr>`}</tbody>
       <tfoot>
-        <tr><td colspan="3">TOTAL (${filtrado.length} registro${filtrado.length === 1 ? "" : "s"})</td><td style="text-align:right;">${formatSoles(total)}</td><td style="text-align:right;">${formatSoles(totalCapital)}</td><td colspan="2"></td></tr>
-        <tr><td colspan="3">Interés/seguro</td><td colspan="2" style="text-align:right;">${formatSoles(totalInteres)}</td><td colspan="2"></td></tr>
+        <tr><td colspan="3">TOTAL (${filtrado.length} registro${filtrado.length === 1 ? "" : "s"})</td><td style="text-align:right;">${formatSoles(total)}</td><td style="text-align:right;">${formatSoles(totalCapital)}</td><td></td></tr>
+        <tr><td colspan="3">Interés/seguro</td><td colspan="2" style="text-align:right;">${formatSoles(totalInteres)}</td><td></td></tr>
       </tfoot>
     </table>`;
 }
@@ -1520,6 +1676,8 @@ function renderAll() {
   document.getElementById("cuota-actual-view").textContent = formatSoles(config.cuotaActual);
   document.getElementById("cuota-inicial-edit").value = config.cuotaInicial;
   document.getElementById("cuota-actual-edit").value = config.cuotaActual;
+  document.getElementById("interes-original-edit").value = config.interesOriginal;
+  document.getElementById("seguro-original-edit").value = config.seguroOriginal;
   document.getElementById("cuota-reduccion").innerHTML = `↓ ${formatSoles(config.cuotaInicial - config.cuotaActual)}/mes`;
   document.getElementById("edit-config-btn").textContent = editingConfig ? "Guardar" : "Editar";
 
@@ -1761,11 +1919,20 @@ function renderAll() {
   } else {
     bancoPagina_lista.forEach((p) => {
       const t = TIPOS[p.tipo] || TIPOS.cuota;
+      const vinculados = aportesVinculados(p.id);
+      const totalVinculado = vinculados.reduce((s, y) => s + y.monto, 0);
+      const diferencia = Math.round((p.monto - totalVinculado) * 100) / 100;
+      const cuadraTexto = Math.abs(diferencia) < 0.01
+        ? `<span style="color:var(--sage);">✅ Cuadra</span>`
+        : diferencia > 0
+          ? `<span style="color:var(--brass2);">⚠️ Falta ${formatSoles(diferencia)}</span>`
+          : `<span style="color:var(--danger);">⚠️ Sobra ${formatSoles(-diferencia)}</span>`;
+      const disponibles = aportesDisponiblesParaVincular();
       const row = document.createElement("div");
       row.className = "ledger-row";
       row.innerHTML = `
         <div class="ledger-row-top">
-          <div class="ledger-date">N° ${formatNumero(p.numero)} · ${formatFecha(p.fecha)}</div>
+          <div class="ledger-date">N° ${formatNumero(p.numero)} · ${formatFecha(p.fecha)}${p.fechaVencimiento ? ` · Vence ${formatFecha(p.fechaVencimiento)}` : ""}</div>
           <div class="ledger-monto">${formatSoles(p.monto)}</div>
         </div>
         <div class="ledger-mid">
@@ -1774,6 +1941,23 @@ function renderAll() {
           ${p.numeroCuota ? `<span class="ledger-numero">Cuota N° ${escapeHtml(p.numeroCuota)}</span>` : ""}
           ${p.nota ? `<span class="nota">${escapeHtml(p.nota)}</span>` : ""}
         </div>
+        <details class="vinculo-detalle">
+          <summary class="vinculo-summary">🔗 ${vinculados.length} aporte(s) vinculado(s) · ${cuadraTexto}</summary>
+          <div class="vinculo-lista">
+            ${vinculados.map((v) => `
+              <div class="vinculo-item">
+                <span>${escapeHtml(NOMBRES_HERMANOS[v.hermano] || "—")} · N°${formatNumero(v.numero)} · ${formatSoles(v.monto)}</span>
+                <button class="del-btn" data-action="desvincular-aporte" data-id="${v.id}">Desvincular</button>
+              </div>`).join("") || `<div class="empty" style="padding:6px 0;">Ningún aporte vinculado todavía.</div>`}
+          </div>
+          <div class="vinculo-agregar">
+            <select class="vinculo-select" id="vinculo-select-${p.id}">
+              <option value="">-- elegir aporte verificado suelto --</option>
+              ${disponibles.map((d) => `<option value="${d.id}">${escapeHtml(NOMBRES_HERMANOS[d.hermano] || "—")} · N°${formatNumero(d.numero)} · ${formatSoles(d.monto)}</option>`).join("")}
+            </select>
+            <button class="add-btn" data-action="vincular-aporte" data-pago-id="${p.id}" style="margin-top:6px;">+ Vincular aporte</button>
+          </div>
+        </details>
         <div class="ledger-actions">
           ${p.imagenUrl ? `<a class="view-btn" href="${p.imagenUrl}" target="_blank" rel="noopener" title="Ver constancia 1">🖼 1</a>` : ""}
           ${p.imagenUrl2 ? `<a class="view-btn" href="${p.imagenUrl2}" target="_blank" rel="noopener" title="Ver constancia 2">🖼 2</a>` : ""}
@@ -1785,6 +1969,7 @@ function renderAll() {
     });
   }
 
+  renderAhorroReal();
   dibujarGraficoCuota();
   renderReporteListado();
   renderReporteFecha();
@@ -1800,11 +1985,26 @@ document.addEventListener("click", async (e) => {
 
   // Acciones que solo puede hacer el administrador (defensa extra, además de
   // que estos botones ni siquiera se muestran a un hermano).
-  const soloAdmin = ["toggle", "delete-yape", "delete-banco"];
+  const soloAdmin = ["toggle", "delete-yape", "delete-banco", "vincular-aporte", "desvincular-aporte"];
   if (soloAdmin.includes(action) && rol.tipo === "hermano") return;
 
   if (action === "edit-yape") { editarYape(id); return; }
   if (action === "edit-banco") { editarBanco(id); return; }
+
+  if (action === "vincular-aporte") {
+    const pagoId = btn.dataset.pagoId;
+    const sel = document.getElementById(`vinculo-select-${pagoId}`);
+    const yapeId = sel ? sel.value : "";
+    if (!yapeId) { showError("Elige un aporte de la lista antes de vincular."); return; }
+    try { await updateDoc(doc(db, "yapes", yapeId), { pagoBancoId: pagoId }); }
+    catch (err) { showError("No se pudo vincular el aporte."); }
+    return;
+  }
+  if (action === "desvincular-aporte") {
+    try { await updateDoc(doc(db, "yapes", id), { pagoBancoId: null }); }
+    catch (err) { showError("No se pudo desvincular el aporte."); }
+    return;
+  }
 
   try {
     if (action === "toggle") {
@@ -1821,6 +2021,11 @@ document.addEventListener("click", async (e) => {
       await deleteDoc(doc(db, "pagosBanco", id));
       if (p?.imagenNombre) await borrarConstancia(p.imagenNombre);
       if (p?.imagenNombre2) await borrarConstancia(p.imagenNombre2);
+      // Los aportes que estaban vinculados a este pago quedan sueltos otra vez
+      const vinculadosAlBorrado = yapes.filter((y) => y.pagoBancoId === id);
+      for (const v of vinculadosAlBorrado) {
+        await updateDoc(doc(db, "yapes", v.id), { pagoBancoId: null });
+      }
     }
   } catch (err) { showError("No se pudo completar la acción."); }
 });
@@ -1847,7 +2052,7 @@ function generarPdfAportes(titulo, subtitulo, filtrado, total, totalVerificado, 
   docPdf.text(`Generado el ${new Date().toLocaleDateString("es-PE")}`, 14, 27);
 
   const filas = filtrado.map((y) => [
-    formatNumero(y.numero),
+    y.numeroOperacion || formatNumero(y.numero),
     formatFecha(y.fechaPago),
     rol.tipo === "hermano" ? nombreActual() : (NOMBRES_HERMANOS[y.hermano] || "—"),
     (CATEGORIAS[y.motivo] || {}).label || y.motivo || "",
@@ -1858,7 +2063,7 @@ function generarPdfAportes(titulo, subtitulo, filtrado, total, totalVerificado, 
 
   docPdf.autoTable({
     startY: 32,
-    head: [["N°", "Fecha", "Persona", "Motivo", "Medio", "Monto", "Estado"]],
+    head: [["N° Operación", "Fecha", "Persona", "Motivo", "Medio", "Monto", "Estado"]],
     body: filas,
     foot: [
       [{ content: `TOTAL (${filtrado.length} registros)`, colSpan: 5 }, formatSoles(total), ""],
@@ -1909,21 +2114,20 @@ document.getElementById("reporte-banco-pdf-btn").addEventListener("click", () =>
   docPdf.text(`Generado el ${new Date().toLocaleDateString("es-PE")}`, 14, 27);
 
   const filas = filtrado.map((p) => [
-    formatNumero(p.numero),
+    p.numeroOperacion || formatNumero(p.numero),
     formatFecha(p.fecha),
     (CATEGORIAS[p.tipo] || {}).label || p.tipo || "",
     formatSoles(p.monto),
     formatSoles(p.montoCapital || p.monto),
-    p.numeroOperacion || "",
   ]);
 
   docPdf.autoTable({
     startY: 32,
-    head: [["N°", "Fecha", "Tipo", "Monto", "A capital", "N° Operación"]],
+    head: [["N° Operación", "Fecha", "Tipo", "Monto", "A capital"]],
     body: filas,
     foot: [
-      [{ content: `TOTAL (${filtrado.length} registros)`, colSpan: 3 }, formatSoles(total), formatSoles(totalCapital), ""],
-      [{ content: "Interés/seguro", colSpan: 4 }, formatSoles(totalInteres), ""],
+      [{ content: `TOTAL (${filtrado.length} registros)`, colSpan: 3 }, formatSoles(total), formatSoles(totalCapital)],
+      [{ content: "Interés/seguro", colSpan: 4 }, formatSoles(totalInteres)],
     ],
     styles: { fontSize: 8, cellPadding: 3 },
     headStyles: { fillColor: [22, 35, 61] },
@@ -1993,6 +2197,31 @@ function generarLibroBackup() {
 
   return wb;
 }
+
+document.getElementById("verificar-numeros-btn").addEventListener("click", async () => {
+  const btn = document.getElementById("verificar-numeros-btn");
+  btn.disabled = true;
+  btn.textContent = "Revisando…";
+  try {
+    const yapesSinNumero = yapes.filter((y) => !y.numero).sort((a, b) => (a.fechaPago < b.fechaPago ? -1 : 1));
+    const bancoSinNumero = pagosBanco.filter((p) => !p.numero).sort((a, b) => (a.fecha < b.fecha ? -1 : 1));
+    for (const y of yapesSinNumero) {
+      const numero = await siguienteNumero("yapes");
+      await updateDoc(doc(db, "yapes", y.id), { numero });
+    }
+    for (const p of bancoSinNumero) {
+      const numero = await siguienteNumero("banco");
+      await updateDoc(doc(db, "pagosBanco", p.id), { numero });
+    }
+    const total = yapesSinNumero.length + bancoSinNumero.length;
+    btn.textContent = total > 0 ? `✓ ${total} registro(s) actualizados` : "✓ Todo en orden, nada que corregir";
+    setTimeout(() => { btn.textContent = "🔧 Verificar N° faltantes"; btn.disabled = false; }, 3000);
+  } catch (e) {
+    showError("No se pudo completar la verificación de números.");
+    btn.disabled = false;
+    btn.textContent = "🔧 Verificar N° faltantes";
+  }
+});
 
 document.getElementById("backup-excel-btn").addEventListener("click", () => {
   const wb = generarLibroBackup();
