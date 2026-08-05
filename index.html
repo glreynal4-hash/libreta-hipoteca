@@ -200,9 +200,7 @@
     .filtros-row input[type="text"]{width:auto;}
   }
 </style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js" defer></script>
+<!-- XLSX y jsPDF ya no se cargan aquí: se cargan solo cuando se necesitan (ver cargarLibreria en el script) -->
 </head>
 <body>
 
@@ -1012,21 +1010,18 @@ async function initApp() {
   document.getElementById("banco-fecha").value = new Date().toISOString().slice(0, 10);
 
   try {
-    const cfgRef = doc(db, "config", "main");
-    const cfgSnap = await getDoc(cfgRef);
-    if (!cfgSnap.exists()) {
-      await setDoc(cfgRef, DEFAULT_CONFIG);
-      config = DEFAULT_CONFIG;
-    } else {
-      config = { ...DEFAULT_CONFIG, ...cfgSnap.data() };
-    }
+    onSnapshot(doc(db, "config", "main"), async (snap) => {
+      if (snap.exists()) {
+        config = { ...DEFAULT_CONFIG, ...snap.data() };
+      } else {
+        try { await setDoc(doc(db, "config", "main"), DEFAULT_CONFIG); config = DEFAULT_CONFIG; }
+        catch (e) { showError("No se pudo guardar la configuración inicial."); }
+      }
+      renderAll();
+    }, () => showError("No se pudo conectar a la base de datos. Revisa la configuración de Firebase."));
   } catch (e) {
     showError("No se pudo conectar a la base de datos. Revisa la configuración de Firebase.");
   }
-
-  onSnapshot(doc(db, "config", "main"), (snap) => {
-    if (snap.exists()) { config = { ...DEFAULT_CONFIG, ...snap.data() }; renderAll(); }
-  });
 
   onSnapshot(query(collection(db, "historialCuota"), orderBy("fecha", "asc")), (snap) => {
     historialCuota = snap.docs.map((d) => d.data());
@@ -2187,6 +2182,28 @@ document.addEventListener("click", async (e) => {
 });
 
 // Calcula el ancho de cada columna según el contenido más largo (encabezado incluido)
+// Carga un <script> externo una sola vez (si ya se cargó, no lo repite).
+const librariasYaCargadas = new Set();
+function cargarLibreria(src) {
+  if (librariasYaCargadas.has(src)) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = src;
+    s.onload = () => { librariasYaCargadas.add(src); resolve(); };
+    s.onerror = () => reject(new Error("No se pudo cargar " + src));
+    document.body.appendChild(s);
+  });
+}
+async function cargarXLSX() {
+  if (window.XLSX) return;
+  await cargarLibreria("https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js");
+}
+async function cargarJsPDF() {
+  if (window.jspdf && window.jspdf.jsPDF && window.jspdf.jsPDF.API.autoTable) return;
+  await cargarLibreria("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js");
+  await cargarLibreria("https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js");
+}
+
 function autoAnchoColumnas(filas) {
   const anchos = [];
   filas.forEach((fila) => {
@@ -2234,7 +2251,12 @@ function generarPdfAportes(titulo, subtitulo, filtrado, total, totalVerificado, 
   docPdf.save(nombreArchivo);
 }
 
-document.getElementById("reporte-pdf-btn").addEventListener("click", () => {
+document.getElementById("reporte-pdf-btn").addEventListener("click", async () => {
+  const btn = document.getElementById("reporte-pdf-btn");
+  const textoOriginal = btn.textContent;
+  btn.disabled = true; btn.textContent = "Cargando…";
+  try { await cargarJsPDF(); } catch (e) { showError("No se pudo cargar el generador de PDF."); btn.disabled = false; btn.textContent = textoOriginal; return; }
+  btn.disabled = false; btn.textContent = textoOriginal;
   const { filtrado, total, totalVerificado, mes, anio, persona } = ultimoReporteListado;
   const nombreMes = mes === "todos" ? "Todos los meses" : `${mes} - ${MESES_NOMBRE[Number(mes) - 1]}`;
   const nombreAnio = anio === "todos" ? "Todos los años" : anio;
@@ -2247,7 +2269,12 @@ document.getElementById("reporte-pdf-btn").addEventListener("click", () => {
   );
 });
 
-document.getElementById("reporte-fecha-pdf-btn").addEventListener("click", () => {
+document.getElementById("reporte-fecha-pdf-btn").addEventListener("click", async () => {
+  const btn = document.getElementById("reporte-fecha-pdf-btn");
+  const textoOriginal = btn.textContent;
+  btn.disabled = true; btn.textContent = "Cargando…";
+  try { await cargarJsPDF(); } catch (e) { showError("No se pudo cargar el generador de PDF."); btn.disabled = false; btn.textContent = textoOriginal; return; }
+  btn.disabled = false; btn.textContent = textoOriginal;
   const { filtrado, total, totalVerificado, desde, hasta, persona } = ultimoReporteFecha;
   const nombrePersonaFiltro = persona === "todos" ? "Todas las personas" : (NOMBRES_HERMANOS[Number(persona)] || "");
   generarPdfAportes(
@@ -2258,7 +2285,12 @@ document.getElementById("reporte-fecha-pdf-btn").addEventListener("click", () =>
   );
 });
 
-document.getElementById("reporte-banco-pdf-btn").addEventListener("click", () => {
+document.getElementById("reporte-banco-pdf-btn").addEventListener("click", async () => {
+  const btnCarga = document.getElementById("reporte-banco-pdf-btn");
+  const textoOriginalCarga = btnCarga.textContent;
+  btnCarga.disabled = true; btnCarga.textContent = "Cargando…";
+  try { await cargarJsPDF(); } catch (e) { showError("No se pudo cargar el generador de PDF."); btnCarga.disabled = false; btnCarga.textContent = textoOriginalCarga; return; }
+  btnCarga.disabled = false; btnCarga.textContent = textoOriginalCarga;
   const { jsPDF } = window.jspdf;
   const docPdf = new jsPDF();
   const { filtrado, total, totalCapital, totalInteres, desde, hasta } = ultimoReportePagosBanco;
@@ -2418,7 +2450,12 @@ document.getElementById("verificar-numeros-btn").addEventListener("click", async
   }
 });
 
-document.getElementById("backup-excel-btn").addEventListener("click", () => {
+document.getElementById("backup-excel-btn").addEventListener("click", async () => {
+  const btn = document.getElementById("backup-excel-btn");
+  const textoOriginal = btn.textContent;
+  btn.disabled = true; btn.textContent = "Cargando…";
+  try { await cargarXLSX(); } catch (e) { showError("No se pudo cargar el generador de Excel."); btn.disabled = false; btn.textContent = textoOriginal; return; }
+  btn.disabled = false; btn.textContent = textoOriginal;
   const wb = generarLibroBackup();
   const nombreArchivo = `respaldo_libreta_hipoteca_${new Date().toISOString().slice(0, 10)}.xlsx`;
   XLSX.writeFile(wb, nombreArchivo);
