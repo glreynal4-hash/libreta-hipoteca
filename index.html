@@ -275,10 +275,13 @@
           <input id="cuota-actual-edit" type="number" class="cuota-input" hidden />
         </div>
         <div class="cuota-col">
-          <div class="cuota-label">Cuota baja (no es el ahorro total)</div>
+          <div class="cuota-label">Cuota baja aproximada</div>
           <div class="cuota-reduccion" id="cuota-reduccion"></div>
         </div>
         <button class="edit-btn" id="edit-config-btn">Editar</button>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin:-10px 0 16px;padding-left:2px;">
+        ⚠️ La "Cuota baja" es real (viene de Interbank), pero si la usas para <em>proyectar</em> un ahorro total (multiplicándola por los meses restantes), el margen de error frente al ahorro real puede ser de <strong>±15% a 20%</strong> — para el número exacto, usa la tarjeta "Ahorro real" de abajo.
       </div>
 
       <div id="cronograma-original-box" class="filtros-row" hidden style="margin-top:-8px;margin-bottom:16px;">
@@ -344,7 +347,7 @@
 
       <!-- YAPES TAB -->
       <div id="tab-yapes">
-        <div class="section-label">👥 APORTES VERIFICADOS POR PERSONA</div>
+        <div class="section-label">👥 APORTES CONFIRMADOS POR PERSONA (Verificado + Pagado)</div>
         <div class="hermanos-grid" id="hermanos-grid"></div>
 
         <div class="totals-row">
@@ -453,15 +456,15 @@
             <option value="pagado">Pagado</option>
           </select>
           <select id="filtro-yape-hermano"></select>
+          <select id="filtro-yape-mes"></select>
           <input id="filtro-yape-desde" type="date" title="Desde" />
           <input id="filtro-yape-hasta" type="date" title="Hasta" />
-          <input id="filtro-yape-numero" type="text" placeholder="N° registro" inputmode="numeric" />
-          <input id="filtro-yape-num-op" type="text" placeholder="N° de Constancia" />
+          <input id="filtro-yape-numero" type="text" placeholder="N° Aporte" inputmode="numeric" />
           <select id="filtro-yape-orden">
             <option value="fecha_desc">Fecha: más reciente</option>
             <option value="fecha_asc">Fecha: más antigua</option>
-            <option value="numero_desc">N° registro: mayor a menor</option>
-            <option value="numero_asc">N° registro: menor a mayor</option>
+            <option value="numero_desc">N° Aporte: mayor a menor</option>
+            <option value="numero_asc">N° Aporte: menor a mayor</option>
           </select>
         </div>
         <div class="ledger" id="yapes-ledger"></div>
@@ -625,6 +628,7 @@
         <div id="subtab-banco-reporte" hidden>
           <div class="filtros-row" style="justify-content:space-between;">
             <div style="display:flex;flex-wrap:wrap;gap:6px;">
+              <select id="reporte-banco-mes"></select>
               <input id="reporte-banco-desde" type="date" title="Desde" />
               <input id="reporte-banco-hasta" type="date" title="Hasta" />
               <select id="reporte-banco-tipo"></select>
@@ -767,7 +771,7 @@ let pagosBanco = [];
 let editingConfig = false;
 let rol = null; // { tipo: "hermano", hermanoIdx: 0 } | { tipo: "encargado" }
 const PAGE_SIZE = 10;
-let yapesFiltro = { estado: "pendiente", hermano: "todos", desde: "", hasta: "", numero: "", numOp: "", orden: "fecha_desc" };
+let yapesFiltro = { estado: "pendiente", hermano: "todos", mes: "todos", desde: "", hasta: "", numero: "", orden: "fecha_desc" };
 let yapesPagina = 1;
 let vistaAdminAportes = "todos"; // "todos" | "0" | "1" | "2"... (índice de la persona cuya pestaña está activa)
 let tabsAbiertas = []; // índices de personas con una pestaña dinámica abierta
@@ -1418,10 +1422,11 @@ document.getElementById("banco-add-btn").addEventListener("click", async () => {
 });
 
 // ---------- FILTROS Y PAGINACIÓN ----------
-["filtro-yape-estado", "filtro-yape-hermano", "filtro-yape-desde", "filtro-yape-hasta", "filtro-yape-orden"].forEach((id) => {
+["filtro-yape-estado", "filtro-yape-hermano", "filtro-yape-mes", "filtro-yape-desde", "filtro-yape-hasta", "filtro-yape-orden"].forEach((id) => {
   document.getElementById(id).addEventListener("change", () => {
     yapesFiltro.estado = document.getElementById("filtro-yape-estado").value;
     yapesFiltro.hermano = document.getElementById("filtro-yape-hermano").value;
+    yapesFiltro.mes = document.getElementById("filtro-yape-mes").value;
     yapesFiltro.desde = document.getElementById("filtro-yape-desde").value;
     yapesFiltro.hasta = document.getElementById("filtro-yape-hasta").value;
     yapesFiltro.orden = document.getElementById("filtro-yape-orden").value;
@@ -1431,11 +1436,6 @@ document.getElementById("banco-add-btn").addEventListener("click", async () => {
 });
 document.getElementById("filtro-yape-numero").addEventListener("input", () => {
   yapesFiltro.numero = document.getElementById("filtro-yape-numero").value.trim();
-  yapesPagina = 1;
-  renderAll();
-});
-document.getElementById("filtro-yape-num-op").addEventListener("input", () => {
-  yapesFiltro.numOp = document.getElementById("filtro-yape-num-op").value.trim().toLowerCase();
   yapesPagina = 1;
   renderAll();
 });
@@ -1732,14 +1732,31 @@ function renderReporteFecha() {
   document.getElementById("reporte-fecha-tabla").innerHTML = construirTablaAportesHtml(filtrado);
 }
 
+function periodoBancoDe(p) {
+  return (p.fechaVencimiento || p.fecha || "").slice(0, 7);
+}
+
 function renderReportePagosBanco() {
   const selTipo = document.getElementById("reporte-banco-tipo");
   poblarSelectTipo(selTipo);
+
+  const selMes = document.getElementById("reporte-banco-mes");
+  const mesesDisponibles = Array.from(new Set(pagosBanco.map((p) => periodoBancoDe(p)).filter(Boolean))).sort().reverse();
+  const prevMesBanco = selMes.value || "todos";
+  selMes.innerHTML = `<option value="todos">Todos los meses (por vencimiento)</option>` +
+    mesesDisponibles.map((m) => {
+      const [a, mm] = m.split("-");
+      return `<option value="${m}">${MESES_NOMBRE[Number(mm) - 1]} ${a}</option>`;
+    }).join("");
+  selMes.value = mesesDisponibles.includes(prevMesBanco) ? prevMesBanco : "todos";
+
   const desde = document.getElementById("reporte-banco-desde").value;
   const hasta = document.getElementById("reporte-banco-hasta").value;
   const tipo = selTipo.value || "todos";
+  const mes = selMes.value || "todos";
 
   const filtrado = pagosBanco.filter((p) => {
+    if (mes !== "todos" && periodoBancoDe(p) !== mes) return false;
     if (desde && p.fecha < desde) return false;
     if (hasta && p.fecha > hasta) return false;
     if (!coincideTipo(p.tipo, tipo)) return false;
@@ -1803,7 +1820,7 @@ function renderReportePagosBanco() {
 ["reporte-fecha-desde", "reporte-fecha-hasta", "reporte-fecha-persona", "reporte-fecha-tipo", "reporte-fecha-estado"].forEach((id) => {
   document.getElementById(id).addEventListener("change", renderReporteFecha);
 });
-["reporte-banco-desde", "reporte-banco-hasta", "reporte-banco-tipo"].forEach((id) => {
+["reporte-banco-mes", "reporte-banco-desde", "reporte-banco-hasta", "reporte-banco-tipo"].forEach((id) => {
   document.getElementById(id).addEventListener("change", renderReportePagosBanco);
 });
 ["reporte-grafico-desde", "reporte-grafico-hasta"].forEach((id) => {
@@ -1826,13 +1843,14 @@ function renderAll() {
   document.getElementById("edit-config-btn").textContent = editingConfig ? "Guardar" : "Editar";
 
   // hermanos grid + select
+  const esConfirmado = (y) => y.estado === "verificado" || y.estado === "pagado";
   const totalesPorHermano = NOMBRES_HERMANOS.map((_, idx) =>
-    yapes.filter((y) => y.hermano === idx && y.estado === "verificado").reduce((s, y) => s + y.monto, 0)
+    yapes.filter((y) => y.hermano === idx && esConfirmado(y)).reduce((s, y) => s + y.monto, 0)
   );
   const desglosePorHermano = NOMBRES_HERMANOS.map((_, idx) => ({
-    cuota: yapes.filter((y) => y.hermano === idx && y.estado === "verificado" && (y.motivo === "reduccion_cuota" || y.motivo === "prepago")).reduce((s, y) => s + y.monto, 0),
-    plazo: yapes.filter((y) => y.hermano === idx && y.estado === "verificado" && y.motivo === "reduccion_plazo").reduce((s, y) => s + y.monto, 0),
-    mensual: yapes.filter((y) => y.hermano === idx && y.estado === "verificado" && (y.motivo === "cuota_mensual" || y.motivo === "cuota")).reduce((s, y) => s + y.monto, 0),
+    cuota: yapes.filter((y) => y.hermano === idx && esConfirmado(y) && (y.motivo === "reduccion_cuota" || y.motivo === "prepago")).reduce((s, y) => s + y.monto, 0),
+    plazo: yapes.filter((y) => y.hermano === idx && esConfirmado(y) && y.motivo === "reduccion_plazo").reduce((s, y) => s + y.monto, 0),
+    mensual: yapes.filter((y) => y.hermano === idx && esConfirmado(y) && (y.motivo === "cuota_mensual" || y.motivo === "cuota")).reduce((s, y) => s + y.monto, 0),
   }));
   const maxTotal = Math.max(1, ...totalesPorHermano);
   const grid = document.getElementById("hermanos-grid");
@@ -1942,14 +1960,25 @@ function renderAll() {
     selFiltroHermano.value = prevF;
   }
 
+  // filtro por mes correspondiente (se arma solo con los meses que ya tienen datos)
+  const selFiltroMes = document.getElementById("filtro-yape-mes");
+  const mesesDisponibles = Array.from(new Set(yapes.map((y) => periodoDe(y)).filter(Boolean))).sort().reverse();
+  const prevMes = selFiltroMes.value || "todos";
+  selFiltroMes.innerHTML = `<option value="todos">Todos los meses</option>` +
+    mesesDisponibles.map((m) => {
+      const [a, mm] = m.split("-");
+      return `<option value="${m}">${MESES_NOMBRE[Number(mm) - 1]} ${a}</option>`;
+    }).join("");
+  selFiltroMes.value = mesesDisponibles.includes(prevMes) ? prevMes : "todos";
+
   // yapes ledger: aplicar filtros
   let yapesFiltrados = yapes.filter((y) => {
     if (yapesFiltro.estado !== "todos" && y.estado !== yapesFiltro.estado) return false;
     if (hermanoFiltroEfectivo !== "todos" && String(y.hermano) !== hermanoFiltroEfectivo) return false;
+    if (yapesFiltro.mes !== "todos" && periodoDe(y) !== yapesFiltro.mes) return false;
     if (yapesFiltro.desde && y.fechaPago < yapesFiltro.desde) return false;
     if (yapesFiltro.hasta && y.fechaPago > yapesFiltro.hasta) return false;
     if (yapesFiltro.numero && !String(y.numero || "").includes(yapesFiltro.numero.replace(/^0+/, ""))) return false;
-    if (yapesFiltro.numOp && !String(y.numeroOperacion || "").toLowerCase().includes(yapesFiltro.numOp)) return false;
     return true;
   });
   yapesFiltrados = ordenarPor(yapesFiltrados, yapesFiltro.orden);
@@ -1976,11 +2005,13 @@ function renderAll() {
       const fechaReg = y.fechaRegistro ? y.fechaRegistro.slice(0, 10) : null;
       const mostrarRegistro = fechaReg && fechaReg !== y.fechaPago;
       const pagoVinculado = y.pagoBancoId ? pagosBanco.find((p) => p.id === y.pagoBancoId) : null;
+      const [anioPeriodo, mesPeriodo] = periodoDe(y).split("-");
+      const nombreMesPeriodo = mesPeriodo ? `${MESES_NOMBRE[Number(mesPeriodo) - 1]} ${anioPeriodo}` : "—";
       const row = document.createElement("div");
       row.className = "ledger-row";
       row.innerHTML = `
         <div class="ledger-row-top">
-          <div class="ledger-date">N° Aporte ${formatNumero(y.numero)} · Fecha de pago: ${formatFecha(y.fechaPago)}${pagoVinculado ? ` · Pago banco N°${formatNumero(pagoVinculado.numero)}` : ""}</div>
+          <div class="ledger-date"><strong style="color:var(--brass);font-size:12px;">Mes: ${nombreMesPeriodo}</strong> · Fecha de pago: ${formatFecha(y.fechaPago)}${pagoVinculado ? ` · Pago banco N°${formatNumero(pagoVinculado.numero)}` : ""}</div>
           <div class="ledger-monto">${formatSoles(y.monto)}</div>
         </div>
         <div class="ledger-mid">
