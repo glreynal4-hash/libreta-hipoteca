@@ -149,6 +149,8 @@
   .vinculo-summary{cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted);
     list-style:none;}
   .vinculo-summary::-webkit-details-marker{display:none;}
+  #actualizar-cronograma-box > summary::-webkit-details-marker{display:none;}
+  #actualizar-cronograma-box[open] .cronograma-flecha{transform:rotate(180deg);display:inline-block;}
   .vinculo-lista{display:flex;flex-direction:column;gap:6px;margin:8px 0;}
   .vinculo-item{display:flex;justify-content:space-between;align-items:center;background:var(--card);
     border-radius:6px;padding:6px 10px;font-size:12px;}
@@ -303,30 +305,37 @@
         </div>
       </div>
 
-      <div id="actualizar-cronograma-box" class="form" style="margin-bottom:16px;" hidden>
-        <div class="section-label" style="margin-top:0;">📈 ACTUALIZAR CRONOGRAMA (tras un nuevo prepago)</div>
-        <div class="form-row">
-          <div class="field-col">
-            <label class="field-label">Fecha del cronograma</label>
-            <input id="cronograma-fecha" type="date" />
+      <details id="actualizar-cronograma-box" style="margin-bottom:16px;" hidden>
+        <summary style="background:#16233D;color:#F7F5F0;font-family:'IBM Plex Mono',monospace;font-size:12px;
+          font-weight:700;letter-spacing:.04em;padding:12px 16px;border-radius:8px;cursor:pointer;
+          list-style:none;display:flex;align-items:center;justify-content:space-between;">
+          <span>📈 ACTUALIZAR CRONOGRAMA (tras un nuevo prepago)</span>
+          <span class="cronograma-flecha" style="font-size:14px;">▾</span>
+        </summary>
+        <div class="form" style="border-top-left-radius:0;border-top-right-radius:0;margin-top:-1px;">
+          <div class="form-row">
+            <div class="field-col">
+              <label class="field-label">Fecha del cronograma</label>
+              <input id="cronograma-fecha" type="date" />
+            </div>
+            <div class="field-col">
+              <label class="field-label">Interés total (S/)</label>
+              <input id="cronograma-interes" type="number" step="0.01" placeholder="Ej. 44661.07" />
+            </div>
+            <div class="field-col">
+              <label class="field-label">Seguro Desgravamen total (S/)</label>
+              <input id="cronograma-seguro" type="number" step="0.01" placeholder="Ej. 1725.79" />
+            </div>
           </div>
-          <div class="field-col">
-            <label class="field-label">Interés total (S/)</label>
-            <input id="cronograma-interes" type="number" step="0.01" placeholder="Ej. 44661.07" />
+          <div class="form-row">
+            <div class="field-col">
+              <label class="field-label">Nueva cuota a pagar (S/)</label>
+              <input id="cronograma-cuota" type="number" step="0.01" placeholder="Ej. 1080.88" />
+            </div>
           </div>
-          <div class="field-col">
-            <label class="field-label">Seguro Desgravamen total (S/)</label>
-            <input id="cronograma-seguro" type="number" step="0.01" placeholder="Ej. 1725.79" />
-          </div>
+          <button class="add-btn" id="cronograma-add-btn">Guardar actualización de cronograma</button>
         </div>
-        <div class="form-row">
-          <div class="field-col">
-            <label class="field-label">Nueva cuota a pagar (S/)</label>
-            <input id="cronograma-cuota" type="number" step="0.01" placeholder="Ej. 1080.88" />
-          </div>
-        </div>
-        <button class="add-btn" id="cronograma-add-btn">Guardar actualización de cronograma</button>
-      </div>
+      </details>
 
       <div class="tabs" id="tabs-row">
         <button class="tab-btn active" data-tab="yapes" id="tab-btn-yapes">📊 Todos los Aportes</button>
@@ -415,7 +424,7 @@
           </div>
           <div class="form-row">
             <div class="field-col">
-              <label class="field-label">N° de Operación (opcional)</label>
+              <label class="field-label">N° de Constancia (Yape/Plin/transferencia)</label>
               <input id="yape-num-operacion" type="text" placeholder="Ej. 000123456" />
             </div>
             <div class="field-col">
@@ -423,7 +432,7 @@
               <input id="yape-num-cuota" type="text" placeholder="Ej. 61" />
             </div>
             <div class="field-col">
-              <label class="field-label">N° Pago (vinculado al banco)</label>
+              <label class="field-label">N° Pago (N° operación del banco, automático)</label>
               <div id="yape-num-pago-vinculado" class="hermano-fijo" style="font-size:12px;color:var(--muted);font-weight:400;">No vinculado todavía</div>
             </div>
           </div>
@@ -435,7 +444,7 @@
         </div>
 
         <div class="section-label" style="display:flex;justify-content:space-between;align-items:center;">
-          <span>📅 HISTORIAL DE PAGOS</span>
+          <span>📅 HISTORIAL DE APORTES</span>
           <button class="export-btn" id="export-yapes-btn">⬇ Exportar a CSV</button>
         </div>
         <div class="filtros-row">
@@ -449,7 +458,7 @@
           <input id="filtro-yape-desde" type="date" title="Desde" />
           <input id="filtro-yape-hasta" type="date" title="Hasta" />
           <input id="filtro-yape-numero" type="text" placeholder="N° registro" inputmode="numeric" />
-          <input id="filtro-yape-num-op" type="text" placeholder="N° de Operación" />
+          <input id="filtro-yape-num-op" type="text" placeholder="N° de Constancia" />
           <select id="filtro-yape-orden">
             <option value="fecha_desc">Fecha: más reciente</option>
             <option value="fecha_asc">Fecha: más antigua</option>
@@ -1626,7 +1635,7 @@ function construirTablaAportesHtml(filtrado) {
   const filas = construirFilasAportes(filtrado);
   return `
     <table class="reporte-table">
-      <thead><tr><th>N° Operación</th><th>Fecha</th><th>Persona</th><th>Motivo</th><th>Medio</th><th style="text-align:right;">Monto</th><th>Estado</th></tr></thead>
+      <thead><tr><th>N° Constancia</th><th>Fecha</th><th>Persona</th><th>Motivo</th><th>Medio</th><th style="text-align:right;">Monto</th><th>Estado</th></tr></thead>
       <tbody>${filas || `<tr><td colspan="7" class="empty">Sin registros para este filtro.</td></tr>`}</tbody>
       <tfoot>
         <tr><td colspan="5">TOTAL (${filtrado.length} registro${filtrado.length === 1 ? "" : "s"})</td><td style="text-align:right;">${formatSoles(total)}</td><td></td></tr>
@@ -1976,14 +1985,14 @@ function renderAll() {
       row.className = "ledger-row";
       row.innerHTML = `
         <div class="ledger-row-top">
-          <div class="ledger-date">Fecha de pago: ${formatFecha(y.fechaPago)} · N° ${formatNumero(y.numero)}${pagoVinculado ? ` · Pago banco N°${formatNumero(pagoVinculado.numero)}` : ""}</div>
+          <div class="ledger-date">N° Aporte ${formatNumero(y.numero)} · Fecha de pago: ${formatFecha(y.fechaPago)}${pagoVinculado ? ` · Pago banco N°${formatNumero(pagoVinculado.numero)}` : ""}</div>
           <div class="ledger-monto">${formatSoles(y.monto)}</div>
         </div>
         <div class="ledger-mid">
           <div class="ledger-hermano">${escapeHtml(rol.tipo === "hermano" ? nombreActual() : (NOMBRES_HERMANOS[y.hermano] || "—"))}</div>
           <span class="motivo-tag" style="color:${m.color};border-color:${m.color}">${m.label}</span>
           ${medio ? `<span class="medio-tag">${medio}</span>` : ""}
-          ${y.numeroOperacion ? `<span class="ledger-numero">Op. ${escapeHtml(y.numeroOperacion)}</span>` : ""}
+          ${y.numeroOperacion ? `<span class="ledger-numero">Const. ${escapeHtml(y.numeroOperacion)}</span>` : ""}
           ${y.numeroCuota ? `<span class="ledger-numero">Cuota N° ${escapeHtml(y.numeroCuota)}</span>` : ""}
           ${y.nota ? `<span class="nota">${escapeHtml(y.nota)}</span>` : ""}
           ${mostrarRegistro ? `<span class="ledger-registro">Registrado el ${formatFecha(fechaReg)}</span>` : ""}
@@ -2075,7 +2084,7 @@ function renderAll() {
       row.className = "ledger-row";
       row.innerHTML = `
         <div class="ledger-row-top">
-          <div class="ledger-date">N° ${formatNumero(p.numero)} · ${formatFecha(p.fecha)}${p.fechaVencimiento ? ` · Vence ${formatFecha(p.fechaVencimiento)}` : ""}</div>
+          <div class="ledger-date">N° Registro ${formatNumero(p.numero)} · ${formatFecha(p.fecha)}${p.fechaVencimiento ? ` · Vence ${formatFecha(p.fechaVencimiento)}` : ""}</div>
           <div class="ledger-monto">${formatSoles(p.monto)}</div>
         </div>
         <div class="ledger-mid">
@@ -2210,7 +2219,7 @@ function generarPdfAportes(titulo, subtitulo, filtrado, total, totalVerificado, 
 
   docPdf.autoTable({
     startY: 32,
-    head: [["N° Operación", "Fecha", "Persona", "Motivo", "Medio", "Monto", "Estado"]],
+    head: [["N° Constancia", "Fecha", "Persona", "Motivo", "Medio", "Monto", "Estado"]],
     body: filas,
     foot: [
       [{ content: `TOTAL (${filtrado.length} registros)`, colSpan: 5 }, formatSoles(total), ""],
@@ -2322,7 +2331,7 @@ function generarLibroBackup() {
   const wb = XLSX.utils.book_new();
 
   // Hoja 1: Aportes (todo, sin filtrar — respaldo completo)
-  const filasAportes = [["N°", "Fecha de pago", "Fecha de registro", "Persona", "Motivo", "Medio de pago", "N° de Operación", "Monto (S/)", "Estado", "Nota", "Link constancia"]];
+  const filasAportes = [["N°", "Fecha de pago", "Fecha de registro", "Persona", "Motivo", "Medio de pago", "N° de Constancia", "Monto (S/)", "Estado", "Nota", "Link constancia"]];
   yapes.forEach((y) => {
     filasAportes.push([
       formatNumero(y.numero),
@@ -2442,7 +2451,7 @@ function descargarCsv(nombreArchivo, filas) {
   URL.revokeObjectURL(url);
 }
 document.getElementById("export-yapes-btn").addEventListener("click", () => {
-  const filas = [["N° registro", "Fecha de pago", "Persona", "Motivo", "Medio de pago", "N° de Operación", "Monto (S/)", "Estado", "Nota", "Link constancia"]];
+  const filas = [["N° registro", "Fecha de pago", "Persona", "Motivo", "Medio de pago", "N° de Constancia", "Monto (S/)", "Estado", "Nota", "Link constancia"]];
   ultimosYapesFiltrados.forEach((y) => {
     filas.push([
       formatNumero(y.numero),
