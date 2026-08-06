@@ -457,10 +457,6 @@
               <input id="yape-fecha-pago" type="date" />
             </div>
             <div class="field-col">
-              <label class="field-label">Mes que corresponde</label>
-              <input id="yape-mes-corresponde" type="month" />
-            </div>
-            <div class="field-col">
               <label class="field-label">Constancia (foto, opcional)</label>
               <input id="yape-imagen" type="file" accept="image/*,application/pdf" />
               <span id="yape-imagen-hint" style="font-size:11px;color:#3D6B54;"></span>
@@ -1059,7 +1055,6 @@ async function initApp() {
   }
 
   document.getElementById("yape-fecha-pago").value = new Date().toISOString().slice(0, 10);
-  document.getElementById("yape-mes-corresponde").value = new Date().toISOString().slice(0, 7);
   document.getElementById("banco-fecha").value = new Date().toISOString().slice(0, 10);
 
   try {
@@ -1223,22 +1218,8 @@ document.addEventListener("change", (e) => {
   }
 });
 
-// El "mes que corresponde" sigue a la fecha de pago automáticamente, salvo
-// que el usuario ya lo haya tocado a mano (ej. pagó en agosto lo de julio).
-let mesCorrespondeTocado = false;
-document.getElementById("yape-mes-corresponde").addEventListener("input", () => { mesCorrespondeTocado = true; });
-document.getElementById("yape-fecha-pago").addEventListener("change", (e) => {
-  if (!mesCorrespondeTocado) {
-    document.getElementById("yape-mes-corresponde").value = e.target.value.slice(0, 7);
-  }
-});
-// Si eliges un N° de Cuota, el mes correspondiente se calcula solo y manda
-// sobre la fecha de pago (ya no hace falta escribirlo a mano).
-document.getElementById("yape-num-cuota").addEventListener("change", (e) => {
-  if (!e.target.value) return;
-  document.getElementById("yape-mes-corresponde").value = periodoDeCuota(e.target.value);
-  mesCorrespondeTocado = true;
-});
+// (El mes correspondiente ya no se escribe a mano: se calcula solo desde
+// el N° de Cuota elegido, o queda como la fecha de pago si no eliges cuota.)
 
 // ---------- CONFIG EDIT ----------
 document.getElementById("edit-config-btn").addEventListener("click", async () => {
@@ -1275,8 +1256,6 @@ function editarYape(id) {
   document.getElementById("yape-medio").value = y.medioPago || "yape";
   document.getElementById("yape-monto").value = y.monto;
   document.getElementById("yape-fecha-pago").value = y.fechaPago;
-  document.getElementById("yape-mes-corresponde").value = y.mesCorresponde || y.fechaPago.slice(0, 7);
-  mesCorrespondeTocado = true;
   document.getElementById("yape-num-operacion").value = y.numeroOperacion || "";
   document.getElementById("yape-num-cuota").value = y.numeroCuota || "";
   document.getElementById("yape-nota").value = y.nota || "";
@@ -1306,8 +1285,6 @@ document.getElementById("yape-cancelar-edicion").addEventListener("click", () =>
   document.getElementById("yape-imagen").value = "";
   document.getElementById("yape-imagen-hint").textContent = "";
   document.getElementById("yape-num-pago-vinculado").textContent = "No vinculado todavía";
-  document.getElementById("yape-mes-corresponde").value = document.getElementById("yape-fecha-pago").value.slice(0, 7);
-  mesCorrespondeTocado = false;
   document.getElementById("yape-add-btn").textContent = "Registrar pago";
   document.getElementById("yape-cancelar-edicion").hidden = true;
 });
@@ -1317,17 +1294,16 @@ document.getElementById("yape-add-btn").addEventListener("click", async () => {
   if (!monto || monto <= 0) return;
   const hermanoIdx = rol.tipo === "hermano" ? rol.hermanoIdx : Number(document.getElementById("yape-hermano").value);
   const fechaPago = document.getElementById("yape-fecha-pago").value;
-  const mesCorresponde = document.getElementById("yape-mes-corresponde").value || fechaPago.slice(0, 7);
+  const numeroCuotaYape = document.getElementById("yape-num-cuota").value;
+  const mesCorresponde = numeroCuotaYape ? periodoDeCuota(numeroCuotaYape) : fechaPago.slice(0, 7);
 
-  // Si el mes que corresponde no coincide con el mes real de la fecha de
-  // pago, se pide confirmar explícitamente (para el caso de pagar en agosto
-  // lo que corresponde a julio, y evitar que sea un error de dedo).
-  if (mesCorresponde !== fechaPago.slice(0, 7)) {
-    const [anioM, mesM] = mesCorresponde.split("-");
-    const nombreMesCorresponde = `${MESES_NOMBRE[Number(mesM) - 1]} ${anioM}`;
+  // Si el N° de Cuota elegido corresponde a un mes distinto al de la fecha
+  // real de pago, se pide confirmar (para el caso de pagar en agosto lo que
+  // corresponde a julio, y evitar que sea un error de dedo).
+  if (numeroCuotaYape && mesCorresponde !== fechaPago.slice(0, 7)) {
     const confirmado = await mostrarConfirmacion(
       "Confirma el mes del aporte",
-      `Tu fecha de pago es ${formatFecha(fechaPago)}, pero marcaste que corresponde a ${nombreMesCorresponde}. ¿Es correcto?`,
+      `Tu fecha de pago es ${formatFecha(fechaPago)}, pero elegiste la Cuota N°${numeroCuotaYape} (${nombrePeriodo(mesCorresponde)}). ¿Es correcto?`,
       "Sí, es correcto"
     );
     if (!confirmado) return;
@@ -1360,7 +1336,7 @@ document.getElementById("yape-add-btn").addEventListener("click", async () => {
       medioPago: document.getElementById("yape-medio").value,
       motivo: document.getElementById("yape-motivo").value,
       fechaPago,
-      mesCorresponde: document.getElementById("yape-mes-corresponde").value || fechaPago.slice(0, 7),
+      mesCorresponde: mesCorresponde,
       numeroOperacion: document.getElementById("yape-num-operacion").value.trim(),
       numeroCuota: document.getElementById("yape-num-cuota").value.trim(),
       monto,
@@ -1382,8 +1358,6 @@ document.getElementById("yape-add-btn").addEventListener("click", async () => {
     document.getElementById("yape-nota").value = "";
     document.getElementById("yape-imagen-hint").textContent = "";
     document.getElementById("yape-num-pago-vinculado").textContent = "No vinculado todavía";
-    document.getElementById("yape-mes-corresponde").value = document.getElementById("yape-fecha-pago").value.slice(0, 7);
-    mesCorrespondeTocado = false;
     fileInput.value = "";
   } catch (e) {
     showError("No se pudo guardar el pago (revisa Storage/Firestore).");
@@ -1777,6 +1751,21 @@ function nombreCuota(numeroCuota) {
   if (!numeroCuota) return "";
   return `${numeroCuota} - ${nombrePeriodo(periodoDeCuota(numeroCuota))}`;
 }
+// Busca qué N° de Cuota corresponde a un período (ej. "2026-01" → 53)
+function cuotaDePeriodo(periodo) {
+  if (!periodo) return null;
+  const total = config.plazoTotalMeses || 120;
+  for (let n = 1; n <= total; n++) {
+    if (periodoDeCuota(n) === periodo) return n;
+  }
+  return null;
+}
+// Etiqueta "N° Cuota - Mes Año" para un período, con respaldo si no hay
+// ninguna cuota que le corresponda (fuera del plazo del crédito)
+function etiquetaPeriodo(periodo) {
+  const n = cuotaDePeriodo(periodo);
+  return n ? `${n} - ${nombrePeriodo(periodo)}` : nombrePeriodo(periodo);
+}
 function poblarSelectCuota(sel, incluirVacio) {
   if (sel.options.length > 0) return; // ya poblado, no repetir
   const totalCuotas = config.plazoTotalMeses || 120;
@@ -2160,15 +2149,13 @@ function renderAll() {
     selFiltroHermano.value = prevF;
   }
 
-  // filtro por mes correspondiente (se arma solo con los meses que ya tienen datos)
+  // filtro por mes correspondiente (se arma solo con los meses que ya tienen
+  // datos, en orden cronológico ascendente, con su N° de Cuota si aplica)
   const selFiltroMes = document.getElementById("filtro-yape-mes");
-  const mesesDisponibles = Array.from(new Set(yapes.map((y) => periodoDe(y)).filter(Boolean))).sort().reverse();
+  const mesesDisponibles = Array.from(new Set(yapes.map((y) => periodoDe(y)).filter(Boolean))).sort();
   const prevMes = selFiltroMes.value || "todos";
   selFiltroMes.innerHTML = `<option value="todos">Todos los meses</option>` +
-    mesesDisponibles.map((m) => {
-      const [a, mm] = m.split("-");
-      return `<option value="${m}">${MESES_NOMBRE[Number(mm) - 1]} ${a}</option>`;
-    }).join("");
+    mesesDisponibles.map((m) => `<option value="${m}">${etiquetaPeriodo(m)}</option>`).join("");
   selFiltroMes.value = mesesDisponibles.includes(prevMes) ? prevMes : "todos";
 
   // filtro por tipo/motivo
@@ -2276,15 +2263,13 @@ function renderAll() {
   document.getElementById("total-banco-mensual-capital").textContent = formatSoles(dMensual.capital);
   document.getElementById("total-banco-mensual-interes").textContent = formatSoles(dMensual.interes);
 
-  // filtro por mes correspondiente (calculado desde el N° de Cuota si existe)
+  // filtro por mes correspondiente (calculado desde el N° de Cuota si existe),
+  // en orden cronológico ascendente
   const selFiltroBancoMes = document.getElementById("filtro-banco-mes");
-  const mesesBancoDisponibles = Array.from(new Set(pagosBanco.map((p) => p.mesCorresponde || periodoBancoDe(p)).filter(Boolean))).sort().reverse();
+  const mesesBancoDisponibles = Array.from(new Set(pagosBanco.map((p) => p.mesCorresponde || periodoBancoDe(p)).filter(Boolean))).sort();
   const prevMesBancoHist = selFiltroBancoMes.value || "todos";
   selFiltroBancoMes.innerHTML = `<option value="todos">Todos los meses</option>` +
-    mesesBancoDisponibles.map((m) => {
-      const [a, mm] = m.split("-");
-      return `<option value="${m}">${MESES_NOMBRE[Number(mm) - 1]} ${a}</option>`;
-    }).join("");
+    mesesBancoDisponibles.map((m) => `<option value="${m}">${etiquetaPeriodo(m)}</option>`).join("");
   selFiltroBancoMes.value = mesesBancoDisponibles.includes(prevMesBancoHist) ? prevMesBancoHist : "todos";
 
   const selFiltroBancoTipo = document.getElementById("filtro-banco-tipo-mov");
@@ -2362,7 +2347,7 @@ function renderAll() {
           <div class="vinculo-agregar">
             <select class="vinculo-select" id="vinculo-select-${p.id}">
               <option value="">-- elegir aporte verificado suelto --</option>
-              ${disponibles.map((d) => `<option value="${d.id}">${escapeHtml(NOMBRES_HERMANOS[d.hermano] || "—")} · ${formatFecha(d.fechaPago)} · ${formatSoles(d.monto)} · N°${formatNumero(d.numero)}</option>`).join("")}
+              ${disponibles.map((d) => `<option value="${d.id}">${escapeHtml(NOMBRES_HERMANOS[d.hermano] || "—")} · ${formatFecha(d.fechaPago)} · ${formatSoles(d.monto)} · N° Registro ${formatNumero(d.numero)}${d.numeroCuota ? " · Cuota N°" + escapeHtml(d.numeroCuota) : ""}</option>`).join("")}
             </select>
             <button class="add-btn" data-action="vincular-aporte" data-pago-id="${p.id}" style="margin-top:6px;">+ Vincular aporte</button>
           </div>
