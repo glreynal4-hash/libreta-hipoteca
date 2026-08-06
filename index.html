@@ -255,8 +255,6 @@
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
           <button class="cambiar-rol" id="cambiar-rol-btn">Cerrar sesión</button>
-          <button class="export-btn" id="backup-excel-btn" hidden>💾 Respaldo Excel</button>
-          <button class="export-btn" id="verificar-numeros-btn" hidden>🔧 Verificar y reparar registros</button>
         </div>
       </div>
 
@@ -305,68 +303,83 @@
 
       <div id="aviso-pendientes" class="aviso-pendientes" hidden></div>
 
-      <div id="ahorro-real-card" style="margin-bottom:16px;background:#0F3D2E;border-radius:10px;padding:18px 20px;" hidden>
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.06em;color:#8FCBAE;text-transform:uppercase;">💰 Ahorro real verificado con Interbank</div>
-        <div id="ahorro-real-monto" style="font-family:'IBM Plex Mono',monospace;font-size:32px;font-weight:700;color:#FAF8F3;margin:4px 0 8px;"></div>
+      <div id="ahorro-real-card" style="margin-bottom:16px;background:#0F3D2E;border:2px solid #2E8F68;border-radius:12px;padding:20px 22px;box-shadow:0 4px 16px rgba(15,61,46,.25);" hidden>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.08em;color:#8FCBAE;text-transform:uppercase;font-weight:700;">🎉 Ahorro real verificado con Interbank</div>
+        <div id="ahorro-real-monto" style="font-family:'IBM Plex Mono',monospace;font-size:40px;font-weight:700;color:#FAF8F3;margin:6px 0 6px;line-height:1;"></div>
+        <div id="ahorro-real-motivador" style="font-size:13px;color:#C9EEDC;font-weight:600;margin-bottom:6px;"></div>
         <div id="ahorro-real-detalle" style="font-size:12px;color:#B9E0CD;"></div>
-        <div style="font-size:11px;color:#7FAF9A;margin-top:8px;border-top:1px solid #1D5A44;padding-top:8px;">
+        <div style="font-size:11px;color:#7FAF9A;margin-top:10px;border-top:1px solid #1D5A44;padding-top:8px;">
           Este número sale de comparar el cronograma original con el más reciente que subió el Administrador — no se calcula multiplicando la reducción mensual por los meses restantes (esa cuenta da un resultado distinto y no es correcta).
         </div>
       </div>
 
-      <details id="actualizar-cronograma-box" style="margin-bottom:16px;" hidden>
-        <summary style="background:#16233D;color:#F7F5F0;font-family:'IBM Plex Mono',monospace;font-size:12px;
-          font-weight:700;letter-spacing:.04em;padding:12px 16px;border-radius:8px;cursor:pointer;
-          list-style:none;display:flex;align-items:center;justify-content:space-between;">
-          <span>📈 ACTUALIZAR CRONOGRAMA (tras un nuevo prepago)</span>
-          <span class="cronograma-flecha" style="font-size:14px;">▾</span>
-        </summary>
-        <div class="form" style="border-top-left-radius:0;border-top-right-radius:0;margin-top:-1px;">
-          <div class="form-row">
-            <div class="field-col">
-              <label class="field-label">Fecha del cronograma</label>
-              <input id="cronograma-fecha" type="date" />
-            </div>
-            <div class="field-col">
-              <label class="field-label">Interés total (S/)</label>
-              <input id="cronograma-interes" type="number" step="0.01" placeholder="Ej. 44661.07" />
-            </div>
-            <div class="field-col">
-              <label class="field-label">Seguro Desgravamen total (S/)</label>
-              <input id="cronograma-seguro" type="number" step="0.01" placeholder="Ej. 1725.79" />
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="field-col">
-              <label class="field-label">Nueva cuota a pagar (S/)</label>
-              <input id="cronograma-cuota" type="number" step="0.01" placeholder="Ej. 1080.88" />
-            </div>
-          </div>
-          <button class="add-btn" id="cronograma-add-btn">Guardar actualización de cronograma</button>
-        </div>
-      </details>
+      <button id="herramientas-toggle-btn" hidden style="width:100%;display:flex;align-items:center;justify-content:space-between;
+        background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px 14px;cursor:pointer;
+        font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:700;color:var(--ink);margin-bottom:16px;">
+        <span>⚙️ Herramientas</span>
+        <span id="herramientas-flecha" style="font-size:14px;">▾</span>
+      </button>
 
-      <details id="excepciones-cuota-box" style="margin-bottom:16px;" hidden>
-        <summary style="background:#5A3D1E;color:#F7F5F0;font-family:'IBM Plex Mono',monospace;font-size:12px;
-          font-weight:700;letter-spacing:.04em;padding:12px 16px;border-radius:8px;cursor:pointer;
-          list-style:none;display:flex;align-items:center;justify-content:space-between;">
-          <span>🔀 Excepción de cuota (solo tras una Reducción de Plazo)</span>
-          <span class="cronograma-flecha" style="font-size:14px;">▾</span>
-        </summary>
-        <div class="form" style="border-top-left-radius:0;border-top-right-radius:0;margin-top:-1px;">
-          <div class="form-row">
-            <div class="field-col">
-              <label class="field-label">N° de Cuota afectada</label>
-              <input id="excepcion-numero" type="number" min="1" placeholder="Ej. 58" />
+      <div id="herramientas-panel" hidden style="margin-bottom:4px;">
+        <details id="actualizar-cronograma-box" style="margin-bottom:16px;">
+          <summary style="background:#16233D;color:#F7F5F0;font-family:'IBM Plex Mono',monospace;font-size:12px;
+            font-weight:700;letter-spacing:.04em;padding:12px 16px;border-radius:8px;cursor:pointer;
+            list-style:none;display:flex;align-items:center;justify-content:space-between;">
+            <span>📈 ACTUALIZAR CRONOGRAMA (tras un nuevo prepago)</span>
+            <span class="cronograma-flecha" style="font-size:14px;">▾</span>
+          </summary>
+          <div class="form" style="border-top-left-radius:0;border-top-right-radius:0;margin-top:-1px;">
+            <div class="form-row">
+              <div class="field-col">
+                <label class="field-label">Fecha del cronograma</label>
+                <input id="cronograma-fecha" type="date" />
+              </div>
+              <div class="field-col">
+                <label class="field-label">Interés total (S/)</label>
+                <input id="cronograma-interes" type="number" step="0.01" placeholder="Ej. 44661.07" />
+              </div>
+              <div class="field-col">
+                <label class="field-label">Seguro Desgravamen total (S/)</label>
+                <input id="cronograma-seguro" type="number" step="0.01" placeholder="Ej. 1725.79" />
+              </div>
             </div>
-            <div class="field-col">
-              <label class="field-label">Mes real correcto</label>
-              <input id="excepcion-mes" type="month" />
+            <div class="form-row">
+              <div class="field-col">
+                <label class="field-label">Nueva cuota a pagar (S/)</label>
+                <input id="cronograma-cuota" type="number" step="0.01" placeholder="Ej. 1080.88" />
+              </div>
             </div>
+            <button class="add-btn" id="cronograma-add-btn">Guardar actualización de cronograma</button>
           </div>
-          <button class="add-btn" id="excepcion-add-btn">Guardar excepción</button>
+        </details>
+
+        <details id="excepciones-cuota-box" style="margin-bottom:16px;">
+          <summary style="background:#5A3D1E;color:#F7F5F0;font-family:'IBM Plex Mono',monospace;font-size:12px;
+            font-weight:700;letter-spacing:.04em;padding:12px 16px;border-radius:8px;cursor:pointer;
+            list-style:none;display:flex;align-items:center;justify-content:space-between;">
+            <span>🔀 Excepción de cuota (solo tras una Reducción de Plazo)</span>
+            <span class="cronograma-flecha" style="font-size:14px;">▾</span>
+          </summary>
+          <div class="form" style="border-top-left-radius:0;border-top-right-radius:0;margin-top:-1px;">
+            <div class="form-row">
+              <div class="field-col">
+                <label class="field-label">N° de Cuota afectada</label>
+                <input id="excepcion-numero" type="number" min="1" placeholder="Ej. 58" />
+              </div>
+              <div class="field-col">
+                <label class="field-label">Mes real correcto</label>
+                <input id="excepcion-mes" type="month" />
+              </div>
+            </div>
+            <button class="add-btn" id="excepcion-add-btn">Guardar excepción</button>
+          </div>
+        </details>
+
+        <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;">
+          <button class="export-btn" id="backup-excel-btn">💾 Respaldo Excel</button>
+          <button class="export-btn" id="verificar-numeros-btn">🔧 Verificar y reparar registros</button>
         </div>
-      </details>
+      </div>
 
       <div class="tabs" id="tabs-row">
         <button class="tab-btn active" data-tab="yapes" id="tab-btn-yapes">📊 Todos los Aportes</button>
@@ -838,12 +851,10 @@ function aplicarRol() {
   const esHermano = rol && rol.tipo === "hermano";
   document.getElementById("tab-btn-banco").hidden = esHermano;
   document.getElementById("edit-config-btn").hidden = esHermano;
-  document.getElementById("backup-excel-btn").hidden = esHermano;
-  document.getElementById("verificar-numeros-btn").hidden = esHermano;
+  document.getElementById("herramientas-toggle-btn").hidden = esHermano;
+  document.getElementById("herramientas-panel").hidden = true; // siempre arranca cerrado
   document.getElementById("subtab-btn-banco-reporte").hidden = esHermano;
   document.getElementById("subtab-btn-grafico").hidden = esHermano;
-  document.getElementById("actualizar-cronograma-box").hidden = esHermano;
-  document.getElementById("excepciones-cuota-box").hidden = esHermano;
   document.getElementById("header-title").textContent = esHermano
     ? `Cuenta: ${nombreActual()}`
     : `Administrador: ${nombreActual()}`;
@@ -1622,6 +1633,22 @@ document.getElementById("excepcion-add-btn").addEventListener("click", async () 
   }
 });
 
+// ---------- MENÚ HERRAMIENTAS (todo cerrado por defecto, acordeón entre sus cajas) ----------
+document.getElementById("herramientas-toggle-btn").addEventListener("click", () => {
+  const panel = document.getElementById("herramientas-panel");
+  panel.hidden = !panel.hidden;
+  document.getElementById("herramientas-flecha").style.transform = panel.hidden ? "rotate(0deg)" : "rotate(180deg)";
+});
+const cajasHerramientas = ["actualizar-cronograma-box", "excepciones-cuota-box"];
+cajasHerramientas.forEach((idAbierta) => {
+  document.getElementById(idAbierta).addEventListener("toggle", (e) => {
+    if (!e.target.open) return;
+    cajasHerramientas.forEach((idOtra) => {
+      if (idOtra !== idAbierta) document.getElementById(idOtra).open = false;
+    });
+  });
+});
+
 function renderAhorroReal() {
   const card = document.getElementById("ahorro-real-card");
   if (historialCronograma.length === 0) { card.hidden = true; return; }
@@ -1631,6 +1658,18 @@ function renderAhorroReal() {
   const ahorro = original - actual;
   card.hidden = false;
   document.getElementById("ahorro-real-monto").textContent = formatSoles(ahorro);
+
+  const totalPrepagadoCuota = pagosBanco
+    .filter((p) => p.tipo === "reduccion_cuota" || p.tipo === "cuota")
+    .reduce((s, p) => s + p.monto, 0);
+  const motivadorEl = document.getElementById("ahorro-real-motivador");
+  if (totalPrepagadoCuota > 0 && ahorro > 0) {
+    const rendimiento = (ahorro / totalPrepagadoCuota) * 100;
+    motivadorEl.textContent = `Eso es un ${rendimiento.toFixed(0)}% de rendimiento sobre lo prepagado — ¡dinero que ya no se lo lleva el banco!`;
+  } else {
+    motivadorEl.textContent = "";
+  }
+
   document.getElementById("ahorro-real-detalle").textContent = `Según cronograma del ${formatFecha(ultimo.fecha)} · Interés+Seguro original S/${original.toFixed(2)} vs. actual S/${actual.toFixed(2)}`;
 }
 
