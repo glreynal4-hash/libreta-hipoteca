@@ -388,8 +388,8 @@
         <button class="tab-btn active" data-tab="yapes" id="tab-btn-yapes">📊 Todos los Aportes</button>
         <span id="tabs-dinamicas" style="display:inline-flex;gap:6px;flex-wrap:wrap;"></span>
         <button class="tab-btn" data-tab="banco" id="tab-btn-banco">🏦 Pagos al Banco</button>
-        <button class="tab-btn" data-tab="reportes" id="tab-btn-reportes">📈 Reportes</button>
         <button class="tab-btn" data-tab="cronograma" id="tab-btn-cronograma">📜 Cronograma</button>
+        <button class="tab-btn" data-tab="reportes" id="tab-btn-reportes">📈 Reportes</button>
       </div>
 
       <!-- YAPES TAB -->
@@ -465,10 +465,6 @@
               <input id="yape-imagen" type="file" accept="image/*,application/pdf" />
               <button type="button" id="yape-leer-imagen-btn" class="export-btn" style="margin-top:6px;font-size:11px;">🔍 Leer datos de la imagen</button>
               <span id="yape-imagen-hint" style="font-size:11px;color:#3D6B54;"></span>
-              <div id="yape-ocr-debug" hidden style="margin-top:6px;background:#FDECEA;border:1px solid #E8C0BA;border-radius:6px;padding:8px;">
-                <div style="font-size:10px;color:#8B241A;margin-bottom:4px;">No encontré el monto — copia este texto y compártelo para ajustar la lectura:</div>
-                <textarea id="yape-ocr-debug-texto" readonly onclick="this.select()" style="width:100%;font-size:10px;font-family:monospace;height:70px;border:1px solid #E8C0BA;border-radius:4px;padding:4px;"></textarea>
-              </div>
             </div>
           </div>
           <div class="form-row">
@@ -527,10 +523,10 @@
             <option value="pendiente" selected>Pendiente</option>
             <option value="pagado">Pagado</option>
           </select>
-          <select id="filtro-yape-hermano"></select>
           <select id="filtro-yape-anio"></select>
           <select id="filtro-yape-mes"></select>
           <select id="filtro-yape-tipo-mov"></select>
+          <select id="filtro-yape-hermano"></select>
           <input id="filtro-yape-desde" type="date" title="Desde" />
           <input id="filtro-yape-hasta" type="date" title="Hasta" />
           <input id="filtro-yape-numero" type="text" placeholder="N° Aporte" inputmode="numeric" />
@@ -685,8 +681,8 @@
         <div id="subtab-listado">
           <div class="filtros-row" style="justify-content:space-between;">
             <div style="display:flex;flex-wrap:wrap;gap:6px;">
-              <select id="reporte-mes"></select>
               <select id="reporte-anio"></select>
+              <select id="reporte-mes"></select>
               <select id="reporte-persona"></select>
               <select id="reporte-tipo"></select>
               <select id="reporte-estado">
@@ -725,8 +721,8 @@
         <div id="subtab-banco-reporte" hidden>
           <div class="filtros-row" style="justify-content:space-between;">
             <div style="display:flex;flex-wrap:wrap;gap:6px;">
-              <select id="reporte-banco-mes-num"></select>
               <select id="reporte-banco-anio"></select>
+              <select id="reporte-banco-mes-num"></select>
               <input id="reporte-banco-desde" type="date" title="Desde" />
               <input id="reporte-banco-hasta" type="date" title="Hasta" />
               <select id="reporte-banco-tipo"></select>
@@ -1440,10 +1436,7 @@ document.getElementById("yape-leer-imagen-btn").addEventListener("click", async 
     document.getElementById("yape-imagen-hint").textContent = mensajeHint;
     document.getElementById("yape-imagen-hint").style.color = (encontrados.length && datos.monto) ? "#8A5A2B" : "#C0392B";
     if (!datos.monto) {
-      document.getElementById("yape-ocr-debug").hidden = false;
-      document.getElementById("yape-ocr-debug-texto").value = data.text;
-    } else {
-      document.getElementById("yape-ocr-debug").hidden = true;
+      console.log("Texto leído por el OCR (monto no identificado):", data.text);
     }
   } catch (e) {
     showError("No se pudo leer la imagen. Complétalo a mano.");
@@ -2970,7 +2963,11 @@ function renderAll() {
       document.getElementById("tab-cronograma").hidden = true;
       vistaAdminAportes = "todos";
       yapesFiltro.estado = "pendiente";
+      yapesFiltro.anio = "todos";
+      yapesFiltro.mes = "todos";
       document.getElementById("filtro-yape-estado").value = "pendiente";
+      document.getElementById("filtro-yape-anio").value = "todos";
+      document.getElementById("filtro-yape-mes").value = "todos";
       yapesPagina = 1;
       renderTabsDinamicas();
       renderAll();
@@ -2995,18 +2992,18 @@ function renderAll() {
   // filtro por año (poblado con los años que ya tienen datos)
   const selFiltroAnio = document.getElementById("filtro-yape-anio");
   const aniosYapesDisponibles = Array.from(new Set(yapes.map((y) => periodoDe(y).slice(0, 4)).filter(Boolean))).sort();
-  const prevAnioYape = selFiltroAnio.value || yapesFiltro.anio || "todos";
+  if (aniosYapesDisponibles.length > 0 && !aniosYapesDisponibles.includes(yapesFiltro.anio)) yapesFiltro.anio = "todos";
   selFiltroAnio.innerHTML = `<option value="todos">Todos los años</option>` + aniosYapesDisponibles.map((a) => `<option value="${a}">${a}</option>`).join("");
-  selFiltroAnio.value = aniosYapesDisponibles.includes(prevAnioYape) ? prevAnioYape : "todos";
+  selFiltroAnio.value = yapesFiltro.anio;
 
   // filtro por mes correspondiente (se arma solo con los meses que ya tienen
   // datos, en orden cronológico ascendente, con su N° de Cuota si aplica)
   const selFiltroMes = document.getElementById("filtro-yape-mes");
   const mesesDisponibles = Array.from(new Set(yapes.map((y) => periodoDe(y)).filter(Boolean))).sort();
-  const prevMes = selFiltroMes.value || "todos";
+  if (mesesDisponibles.length > 0 && !mesesDisponibles.includes(yapesFiltro.mes)) yapesFiltro.mes = "todos";
   selFiltroMes.innerHTML = `<option value="todos">Todos los meses</option>` +
     mesesDisponibles.map((m) => `<option value="${m}">${etiquetaPeriodo(m)}</option>`).join("");
-  selFiltroMes.value = mesesDisponibles.includes(prevMes) ? prevMes : "todos";
+  selFiltroMes.value = yapesFiltro.mes;
 
   // filtro por tipo/motivo
   const selFiltroTipoMov = document.getElementById("filtro-yape-tipo-mov");
@@ -3120,18 +3117,18 @@ function renderAll() {
   // filtro por año (poblado con los años que ya tienen datos)
   const selFiltroBancoAnio = document.getElementById("filtro-banco-anio");
   const aniosBancoHistDisponibles = Array.from(new Set(pagosBanco.map((p) => (p.mesCorresponde || periodoBancoDe(p)).slice(0, 4)).filter(Boolean))).sort();
-  const prevAnioBancoHist = selFiltroBancoAnio.value || bancoFiltro.anio || "todos";
+  if (aniosBancoHistDisponibles.length > 0 && !aniosBancoHistDisponibles.includes(bancoFiltro.anio)) bancoFiltro.anio = "todos";
   selFiltroBancoAnio.innerHTML = `<option value="todos">Todos los años</option>` + aniosBancoHistDisponibles.map((a) => `<option value="${a}">${a}</option>`).join("");
-  selFiltroBancoAnio.value = aniosBancoHistDisponibles.includes(prevAnioBancoHist) ? prevAnioBancoHist : "todos";
+  selFiltroBancoAnio.value = bancoFiltro.anio;
 
   // filtro por mes correspondiente (calculado desde el N° de Cuota si existe),
   // en orden cronológico ascendente
   const selFiltroBancoMes = document.getElementById("filtro-banco-mes");
   const mesesBancoDisponibles = Array.from(new Set(pagosBanco.map((p) => p.mesCorresponde || periodoBancoDe(p)).filter(Boolean))).sort();
-  const prevMesBancoHist = selFiltroBancoMes.value || "todos";
+  if (mesesBancoDisponibles.length > 0 && !mesesBancoDisponibles.includes(bancoFiltro.mes)) bancoFiltro.mes = "todos";
   selFiltroBancoMes.innerHTML = `<option value="todos">Todos los meses</option>` +
     mesesBancoDisponibles.map((m) => `<option value="${m}">${etiquetaPeriodo(m)}</option>`).join("");
-  selFiltroBancoMes.value = mesesBancoDisponibles.includes(prevMesBancoHist) ? prevMesBancoHist : "todos";
+  selFiltroBancoMes.value = bancoFiltro.mes;
 
   const selFiltroBancoTipo = document.getElementById("filtro-banco-tipo-mov");
   poblarSelectTipo(selFiltroBancoTipo);
