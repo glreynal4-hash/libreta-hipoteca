@@ -463,6 +463,7 @@
             <div class="field-col">
               <label class="field-label">Constancia (foto, opcional)</label>
               <input id="yape-imagen" type="file" accept="image/*,application/pdf" />
+              <button type="button" id="yape-leer-imagen-btn" class="export-btn" style="margin-top:6px;font-size:11px;">🔍 Leer datos de la imagen</button>
               <span id="yape-imagen-hint" style="font-size:11px;color:#3D6B54;"></span>
             </div>
           </div>
@@ -1258,6 +1259,96 @@ function renderTabsDinamicas() {
 // Nota automática para el caso habitual de Cristian (pago vía mamá) — solo
 // al dar de alta un aporte nuevo, y solo si la nota está vacía (no pisa lo
 // que ya se haya escrito).
+// ---------- LECTURA AUTOMÁTICA DE CONSTANCIAS (OCR, Tesseract.js) ----------
+const MESES_ABREV = { ene: 1, feb: 2, mar: 3, abr: 4, may: 5, jun: 6, jul: 7, ago: 8, sep: 9, set: 9, oct: 10, nov: 11, dic: 12 };
+
+// Intenta encontrar monto, fecha y N° de operación en el texto leído de una constancia.
+function extraerDatosDeTexto(texto) {
+  const resultado = { monto: null, fecha: null, numeroOperacion: null, numeroCuota: null };
+
+  // Monto: el primer "S/ 255.00" que aparezca (normalmente es el monto principal)
+  const matchMonto = texto.match(/S\/\.?\s*(\d[\d,]*\.\d{2})/);
+  if (matchMonto) resultado.monto = matchMonto[1].replace(/,/g, "");
+
+  // Fecha tipo "29 May 2026"
+  const matchFechaTexto = texto.match(/(\d{1,2})\s*([A-Za-zñÑ]{3,})\.?\s*(\d{4})/);
+  if (matchFechaTexto) {
+    const mesTexto = matchFechaTexto[2].toLowerCase().slice(0, 3);
+    const mesNum = MESES_ABREV[mesTexto];
+    if (mesNum) {
+      const dia = matchFechaTexto[1].padStart(2, "0");
+      const mes = String(mesNum).padStart(2, "0");
+      resultado.fecha = `${matchFechaTexto[3]}-${mes}-${dia}`;
+    }
+  }
+  // Fecha tipo dd/mm/aaaa, como respaldo si no encontró la anterior
+  if (!resultado.fecha) {
+    const matchFechaBarras = texto.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+    if (matchFechaBarras) resultado.fecha = `${matchFechaBarras[3]}-${matchFechaBarras[2]}-${matchFechaBarras[1]}`;
+  }
+
+  // N° de operación / código de operación
+  const matchOperacion = texto.match(/(?:c[oó]digo\s*de\s*)?operaci[oó]n[:\s]*([0-9]{5,})/i);
+  if (matchOperacion) resultado.numeroOperacion = matchOperacion[1];
+
+  // N° de Cuota: si la constancia lo dice directo ("Cuota N° 53")...
+  const matchCuotaDirecta = texto.match(/cuota\s*n[°ºo]?\s*[:\s]\s*(\d{1,3})\b/i);
+  if (matchCuotaDirecta) {
+    resultado.numeroCuota = matchCuotaDirecta[1];
+  } else {
+    // ...o si no, se calcula desde "Cuotas pendientes: NN cuotas" (dato que
+    // sí traen los comprobantes de prepago de Interbank).
+    const matchPendientes = texto.match(/cuotas?\s*pendientes?[:\s]*(\d{1,3})/i);
+    if (matchPendientes) {
+      const pendientes = Number(matchPendientes[1]);
+      const plazoTotal = config.plazoTotalMeses || 120;
+      const calculada = plazoTotal - pendientes;
+      if (calculada >= 1 && calculada <= plazoTotal) resultado.numeroCuota = String(calculada);
+    }
+  }
+
+  return resultado;
+}
+
+document.getElementById("yape-leer-imagen-btn").addEventListener("click", async () => {
+  const fileInput = document.getElementById("yape-imagen");
+  const file = fileInput.files[0];
+  if (!file) { showError("Primero elige una foto en 'Constancia'."); return; }
+  if (!file.type.startsWith("image/")) { showError("La lectura automática solo funciona con fotos (no con PDF)."); return; }
+
+  const btn = document.getElementById("yape-leer-imagen-btn");
+  const textoOriginal = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Cargando lector…";
+  try {
+    await cargarTesseract();
+    btn.textContent = "Leyendo imagen… (puede tardar unos segundos)";
+    const { data } = await Tesseract.recognize(file, "spa");
+    const datos = extraerDatosDeTexto(data.text);
+    let encontrados = [];
+    if (datos.monto) { document.getElementById("yape-monto").value = datos.monto; encontrados.push("monto"); }
+    if (datos.fecha) { document.getElementById("yape-fecha-pago").value = datos.fecha; encontrados.push("fecha"); }
+    if (datos.numeroOperacion) { document.getElementById("yape-num-operacion").value = datos.numeroOperacion; encontrados.push("N° de constancia"); }
+    if (datos.numeroCuota) {
+      const selCuota = document.getElementById("yape-num-cuota");
+      poblarSelectCuota(selCuota, true);
+      if ([...selCuota.options].some((o) => o.value === datos.numeroCuota)) {
+        selCuota.value = datos.numeroCuota;
+        encontrados.push("N° de cuota (revisa si es correcta)");
+      }
+    }
+    document.getElementById("yape-imagen-hint").textContent = encontrados.length
+      ? `🔍 Se leyó: ${encontrados.join(", ")} — revisa que esté correcto antes de guardar.`
+      : "🔍 No se pudo identificar ningún dato en la imagen — complétalo a mano.";
+    document.getElementById("yape-imagen-hint").style.color = encontrados.length ? "#8A5A2B" : "#C0392B";
+  } catch (e) {
+    showError("No se pudo leer la imagen. Complétalo a mano.");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = textoOriginal;
+  }
+});
+
 function intentarNotaAutomatica() {
   if (yapeEditId) return;
   const notaEl = document.getElementById("yape-nota");
@@ -3046,6 +3137,10 @@ async function cargarJsPDF() {
   if (window.jspdf && window.jspdf.jsPDF && window.jspdf.jsPDF.API.autoTable) return;
   await cargarLibreria("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js");
   await cargarLibreria("https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js");
+}
+async function cargarTesseract() {
+  if (window.Tesseract) return;
+  await cargarLibreria("https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js");
 }
 
 function autoAnchoColumnas(filas) {
