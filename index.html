@@ -1374,7 +1374,23 @@ document.getElementById("yape-leer-imagen-btn").addEventListener("click", async 
     await cargarTesseract();
     btn.textContent = "Leyendo imagen… (puede tardar unos segundos)";
     const { data } = await Tesseract.recognize(file, "spa");
-    const datos = extraerDatosDeTexto(data.text);
+    let datos = extraerDatosDeTexto(data.text);
+
+    // Si no encontró el monto, reintenta con un modo distinto del lector,
+    // pensado para números grandes y aislados (como el de Yape) en vez de
+    // texto corrido — solo se hace esta segunda pasada cuando hace falta.
+    if (!datos.monto) {
+      btn.textContent = "No encontré el monto, reintentando…";
+      try {
+        const worker = await Tesseract.createWorker("spa");
+        await worker.setParameters({ tessedit_pageseg_mode: "11" }); // texto disperso
+        const resultado2 = await worker.recognize(file);
+        await worker.terminate();
+        const datos2 = extraerDatosDeTexto(resultado2.data.text);
+        if (datos2.monto) datos.monto = datos2.monto;
+      } catch (e2) { /* si falla el reintento, seguimos con lo que ya teníamos */ }
+    }
+
     let encontrados = [];
     if (datos.monto) { document.getElementById("yape-monto").value = datos.monto; encontrados.push("monto"); }
     if (datos.fecha) { document.getElementById("yape-fecha-pago").value = datos.fecha; encontrados.push("fecha"); }
