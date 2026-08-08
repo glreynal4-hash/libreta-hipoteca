@@ -488,6 +488,19 @@
           <div class="form-row">
             <input id="yape-nota" placeholder="Nota (opcional)" style="grid-column:1/-1" />
           </div>
+          <div class="form-row" id="yape-generar-pago-row" hidden>
+            <div class="field-col" style="grid-column:1/-1;">
+              <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;">
+                <input type="checkbox" id="yape-generar-pago-check" style="width:auto;" />
+                Este aporte también generó un pago directo al banco
+              </label>
+              <div id="yape-generar-pago-detalle" hidden style="margin-top:8px;">
+                <label class="field-label">Monto TOTAL pagado al banco (puede ser distinto a tu aporte)</label>
+                <input id="yape-generar-pago-monto" type="number" step="0.01" placeholder="Ej. 1131.08" />
+              </div>
+              <div id="yape-generar-pago-bloqueado-hint" hidden style="font-size:11px;color:var(--muted);margin-top:4px;">Este aporte ya está vinculado a un pago — desvincúlalo primero (desde Pagos al Banco) si necesitas rehacerlo.</div>
+            </div>
+          </div>
           <button class="add-btn" id="yape-add-btn">Registrar pago</button>
           <button class="cambiar-rol" id="yape-cancelar-edicion" hidden style="margin-top:4px;">Cancelar edición</button>
         </div>
@@ -902,6 +915,7 @@ function aplicarRol() {
   document.getElementById("tab-btn-cronograma").hidden = esHermano;
   document.getElementById("edit-config-btn").hidden = esHermano;
   document.getElementById("herramientas-toggle-btn").hidden = esHermano;
+  document.getElementById("yape-generar-pago-row").hidden = esHermano;
   document.getElementById("herramientas-panel").hidden = true; // siempre arranca cerrado
   document.getElementById("subtab-btn-banco-reporte").hidden = esHermano;
   document.getElementById("subtab-btn-grafico").hidden = esHermano;
@@ -1462,8 +1476,14 @@ function editarYape(id) {
     document.getElementById("yape-num-pago-vinculado").textContent = pagoVinculado
       ? (pagoVinculado.numeroOperacion || `Pago N°${formatNumero(pagoVinculado.numero)} (sin N° operación)`)
       : "Vinculado (pago no encontrado)";
+    document.getElementById("yape-generar-pago-check").checked = false;
+    document.getElementById("yape-generar-pago-check").disabled = true;
+    document.getElementById("yape-generar-pago-detalle").hidden = true;
+    document.getElementById("yape-generar-pago-bloqueado-hint").hidden = false;
   } else {
     document.getElementById("yape-num-pago-vinculado").textContent = "No vinculado todavía";
+    document.getElementById("yape-generar-pago-check").disabled = false;
+    document.getElementById("yape-generar-pago-bloqueado-hint").hidden = true;
   }
   const sel = document.getElementById("yape-hermano");
   if (sel) sel.value = y.hermano;
@@ -1482,8 +1502,16 @@ document.getElementById("yape-cancelar-edicion").addEventListener("click", () =>
   document.getElementById("yape-imagen").value = "";
   document.getElementById("yape-imagen-hint").textContent = "";
   document.getElementById("yape-num-pago-vinculado").textContent = "No vinculado todavía";
+  document.getElementById("yape-generar-pago-check").disabled = false;
+  document.getElementById("yape-generar-pago-check").checked = false;
+  document.getElementById("yape-generar-pago-detalle").hidden = true;
+  document.getElementById("yape-generar-pago-bloqueado-hint").hidden = true;
   document.getElementById("yape-add-btn").textContent = "Registrar pago";
   document.getElementById("yape-cancelar-edicion").hidden = true;
+});
+
+document.getElementById("yape-generar-pago-check").addEventListener("change", (e) => {
+  document.getElementById("yape-generar-pago-detalle").hidden = !e.target.checked;
 });
 
 document.getElementById("yape-add-btn").addEventListener("click", async () => {
@@ -1541,20 +1569,74 @@ document.getElementById("yape-add-btn").addEventListener("click", async () => {
       imagenUrl,
       imagenNombre,
     };
+    let idDelAporte = yapeEditId;
     if (editando) {
       await updateDoc(doc(db, "yapes", yapeEditId), datos);
       yapeEditId = null;
       document.getElementById("yape-cancelar-edicion").hidden = true;
     } else {
       const numero = await siguienteNumero("yapes");
-      await addDoc(collection(db, "yapes"), { ...datos, numero, fechaRegistro: new Date().toISOString(), estado: "pendiente" });
+      const ref = await addDoc(collection(db, "yapes"), { ...datos, numero, fechaRegistro: new Date().toISOString(), estado: "pendiente" });
+      idDelAporte = ref.id;
     }
+
+    // ---- "Este aporte también generó un pago directo al banco" ----
+    const checkGenerarPago = document.getElementById("yape-generar-pago-check");
+    let mensajeVinculoAuto = "";
+    if (checkGenerarPago.checked && !checkGenerarPago.disabled) {
+      const montoTotalPago = Number(document.getElementById("yape-generar-pago-monto").value);
+      if (montoTotalPago > 0) {
+        const numeroPago = await siguienteNumero("banco");
+        const refPago = await addDoc(collection(db, "pagosBanco"), {
+          fecha: fechaPago,
+          fechaVencimiento: null,
+          mesCorresponde: mesCorresponde,
+          monto: montoTotalPago,
+          tipo: datos.motivo,
+          montoCapital: null,
+          numeroOperacion: "",
+          numeroCuota: datos.numeroCuota,
+          nota: `Generado automáticamente desde el aporte de ${NOMBRES_HERMANOS[hermanoIdx]}.`,
+          imagenUrl: null,
+          imagenNombre: null,
+          imagenUrl2: null,
+          imagenNombre2: null,
+          numero: numeroPago,
+        });
+        await updateDoc(doc(db, "yapes", idDelAporte), { pagoBancoId: refPago.id, estado: "pagado" });
+
+        // Busca otros aportes Verificados y sueltos, con el mismo N° de Cuota
+        // y el mismo tipo, para vincularlos también automáticamente.
+        const otrosParaVincular = yapes.filter((y) =>
+          y.id !== idDelAporte &&
+          y.estado === "verificado" &&
+          !y.pagoBancoId &&
+          String(y.numeroCuota) === String(datos.numeroCuota) &&
+          y.motivo === datos.motivo
+        );
+        for (const otro of otrosParaVincular) {
+          await updateDoc(doc(db, "yapes", otro.id), { pagoBancoId: refPago.id, estado: "pagado" });
+        }
+        if (otrosParaVincular.length > 0) {
+          const nombres = otrosParaVincular.map((o) => `${NOMBRES_HERMANOS[o.hermano]} ${formatSoles(o.monto)}`).join(", ");
+          mensajeVinculoAuto = ` También se vincularon automáticamente: ${nombres}.`;
+        }
+        document.getElementById("yape-generar-pago-check").checked = false;
+        document.getElementById("yape-generar-pago-monto").value = "";
+        document.getElementById("yape-generar-pago-detalle").hidden = true;
+      }
+    }
+    if (mensajeVinculoAuto) {
+      await mostrarConfirmacion("Pago generado", `Se creó el Pago al Banco y se vinculó tu aporte.${mensajeVinculoAuto}`, "Entendido");
+    }
+
     document.getElementById("yape-monto").value = "";
     document.getElementById("yape-num-operacion").value = "";
     document.getElementById("yape-num-cuota").value = "";
     document.getElementById("yape-nota").value = "";
     document.getElementById("yape-imagen-hint").textContent = "";
     document.getElementById("yape-num-pago-vinculado").textContent = "No vinculado todavía";
+    document.getElementById("yape-generar-pago-check").disabled = false;
     fileInput.value = "";
   } catch (e) {
     showError("No se pudo guardar el pago (revisa Storage/Firestore).");
@@ -2040,8 +2122,10 @@ function aportesVinculados(pagoId) {
   return yapes.filter((y) => y.pagoBancoId === pagoId);
 }
 // Aportes verificados que aún no están vinculados a ningún pago (sueltos)
-function aportesDisponiblesParaVincular() {
-  return yapes.filter((y) => y.estado === "verificado" && !y.pagoBancoId);
+function aportesDisponiblesParaVincular(tipoPago) {
+  const aliasTipo = { cuota: "reduccion_cuota", prepago: "reduccion_cuota", plazo: "reduccion_plazo" };
+  const tipoNormalizado = tipoPago ? (aliasTipo[tipoPago] || tipoPago) : null;
+  return yapes.filter((y) => y.estado === "verificado" && !y.pagoBancoId && (!tipoNormalizado || coincideTipo(y.motivo, tipoNormalizado)));
 }
 
 // ---------- N° DE CUOTA → MES/AÑO ----------
@@ -3036,7 +3120,7 @@ function renderAll() {
         : diferencia > 0
           ? `<span style="color:var(--brass2);">⚠️ Falta ${formatSoles(diferencia)}</span>`
           : `<span style="color:var(--danger);">⚠️ Sobra ${formatSoles(-diferencia)}</span>`;
-      const disponibles = aportesDisponiblesParaVincular();
+      const disponibles = aportesDisponiblesParaVincular(p.tipo);
       const tituloCuota = p.numeroCuota
         ? `N° Cuota ${escapeHtml(p.numeroCuota)} - ${nombrePeriodo(p.mesCorresponde || periodoDeCuota(p.numeroCuota))}`
         : "Sin N° de Cuota asignado";
