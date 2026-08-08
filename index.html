@@ -110,7 +110,9 @@
   .ledger{display:flex;flex-direction:column;border:1px solid var(--border);border-radius:8px;overflow:hidden;}
   .empty{padding:18px 14px;font-size:13px;color:var(--muted);text-align:center;font-style:italic;}
   .ledger-row{display:flex;flex-direction:column;gap:6px;padding:10px 14px;border-bottom:1px solid #EFEADB;
-    background:#FDFCF8;}
+    background:#FDFCF8;cursor:pointer;transition:background .12s ease;border-left:3px solid transparent;}
+  .ledger-row:hover{background:#F3EFE0;}
+  .ledger-row.fila-seleccionada{background:#FCF0DC;border-left:3px solid var(--brass);}
   .ledger-row-top{display:flex;justify-content:space-between;align-items:center;gap:10px;}
   .ledger-date{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted);}
   .ledger-mid{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0;}
@@ -378,6 +380,7 @@
         <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;">
           <button class="export-btn" id="backup-excel-btn">💾 Respaldo Excel</button>
           <button class="export-btn" id="verificar-numeros-btn">🔧 Verificar y reparar registros</button>
+          <button class="export-btn" id="cargar-historico-2025-btn" style="border-color:#8A5A2B;">📦 Cargar histórico 2025 (una sola vez)</button>
         </div>
       </div>
 
@@ -495,6 +498,7 @@
             <option value="pagado">Pagado</option>
           </select>
           <select id="filtro-yape-hermano"></select>
+          <select id="filtro-yape-anio"></select>
           <select id="filtro-yape-mes"></select>
           <select id="filtro-yape-tipo-mov"></select>
           <input id="filtro-yape-desde" type="date" title="Desde" />
@@ -508,7 +512,15 @@
             <option value="cuota_desc">N° Cuota: mayor a menor</option>
             <option value="cuota_asc">N° Cuota: menor a mayor</option>
           </select>
+          <select id="filtro-yape-porpagina">
+            <option value="10">10 por página</option>
+            <option value="20">20 por página</option>
+            <option value="50">50 por página</option>
+            <option value="100">100 por página</option>
+            <option value="9999">Todos</option>
+          </select>
         </div>
+        <div id="yapes-sumatorio" style="font-size:12px;color:var(--muted);margin-bottom:8px;"></div>
         <div class="ledger" id="yapes-ledger"></div>
         <div class="paginacion">
           <button id="yapes-pag-prev">‹ Anterior</button>
@@ -598,6 +610,7 @@
           <button class="export-btn" id="export-banco-btn">⬇ Exportar a CSV</button>
         </div>
         <div class="filtros-row">
+          <select id="filtro-banco-anio"></select>
           <select id="filtro-banco-mes"></select>
           <select id="filtro-banco-tipo-mov"></select>
           <input id="filtro-banco-desde" type="date" title="Desde" />
@@ -611,7 +624,15 @@
             <option value="cuota_desc">N° Cuota: mayor a menor</option>
             <option value="cuota_asc">N° Cuota: menor a mayor</option>
           </select>
+          <select id="filtro-banco-porpagina">
+            <option value="10">10 por página</option>
+            <option value="20">20 por página</option>
+            <option value="50">50 por página</option>
+            <option value="100">100 por página</option>
+            <option value="9999">Todos</option>
+          </select>
         </div>
+        <div id="banco-sumatorio" style="font-size:12px;color:var(--muted);margin-bottom:8px;"></div>
         <div class="ledger" id="banco-ledger"></div>
         <div class="paginacion">
           <button id="banco-pag-prev">‹ Anterior</button>
@@ -627,6 +648,7 @@
           <button class="subtab-btn" data-subtab="fecha" id="subtab-btn-fecha">📆 Listado General x Fecha</button>
           <button class="subtab-btn" data-subtab="banco" id="subtab-btn-banco-reporte">🏦 Pagos Banco</button>
           <button class="subtab-btn" data-subtab="grafico" id="subtab-btn-grafico">📉 Gráfico</button>
+          <button class="subtab-btn" data-subtab="validacion" id="subtab-btn-validacion">✅ Validación</button>
         </div>
 
         <!-- LISTADO GENERAL (por mes/año) -->
@@ -692,6 +714,17 @@
           </div>
           <div class="section-label" id="chart-label">📉 PROGRESO DE LA CUOTA</div>
           <div id="chart-cuota-container" style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px 14px 4px;"></div>
+        </div>
+
+        <!-- VALIDACIÓN (solo Administrador) -->
+        <div id="subtab-validacion" hidden>
+          <div class="filtros-row">
+            <select id="validacion-anio"></select>
+            <select id="validacion-mes-desde"></select>
+            <select id="validacion-mes-hasta"></select>
+          </div>
+          <div id="validacion-resumen" style="margin-bottom:14px;"></div>
+          <div id="validacion-tabla" style="overflow-x:auto;"></div>
         </div>
       </div>
 
@@ -816,8 +849,9 @@ let yapes = [];
 let pagosBanco = [];
 let editingConfig = false;
 let rol = null; // { tipo: "hermano", hermanoIdx: 0 } | { tipo: "encargado" }
-const PAGE_SIZE = 10;
-let yapesFiltro = { estado: "pendiente", hermano: "todos", mes: "todos", tipoMov: "todos", desde: "", hasta: "", numero: "", numConst: "", numCuota: "", orden: "fecha_desc" };
+let yapesPageSize = 10;
+let bancoPageSize = 10;
+let yapesFiltro = { estado: "pendiente", hermano: "todos", anio: "todos", mes: "todos", tipoMov: "todos", desde: "", hasta: "", numero: "", numConst: "", numCuota: "", orden: "fecha_desc" };
 let yapesPagina = 1;
 let vistaAdminAportes = "todos"; // "todos" | "0" | "1" | "2"... (índice de la persona cuya pestaña está activa)
 let tabsAbiertas = []; // índices de personas con una pestaña dinámica abierta
@@ -828,7 +862,7 @@ let ultimoReporteFecha = { filtrado: [], total: 0, totalVerificado: 0 };
 let ultimoReportePagosBanco = { filtrado: [], total: 0, totalCapital: 0, totalInteres: 0 };
 let historialCronograma = [];
 let historialCuota = [];
-let bancoFiltro = { mes: "todos", tipoMov: "todos", desde: "", hasta: "", numero: "", numOp: "", numCuota: "", orden: "fecha_desc" };
+let bancoFiltro = { anio: "todos", mes: "todos", tipoMov: "todos", desde: "", hasta: "", numero: "", numOp: "", numCuota: "", orden: "fecha_desc" };
 let bancoPagina = 1;
 
 function cargarRol() {
@@ -851,6 +885,7 @@ function aplicarRol() {
   document.getElementById("herramientas-panel").hidden = true; // siempre arranca cerrado
   document.getElementById("subtab-btn-banco-reporte").hidden = esHermano;
   document.getElementById("subtab-btn-grafico").hidden = esHermano;
+  document.getElementById("subtab-btn-validacion").hidden = esHermano;
   document.getElementById("header-title").textContent = esHermano
     ? `Cuenta: ${nombreActual()}`
     : `Administrador: ${nombreActual()}`;
@@ -869,6 +904,7 @@ function aplicarRol() {
     document.getElementById("subtab-fecha").hidden = true;
     document.getElementById("subtab-banco-reporte").hidden = true;
     document.getElementById("subtab-grafico").hidden = true;
+    document.getElementById("subtab-validacion").hidden = true;
     document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
     document.querySelector('.tab-btn[data-tab="yapes"]').classList.add("active");
   } else {
@@ -1483,10 +1519,11 @@ document.getElementById("banco-add-btn").addEventListener("click", async () => {
 });
 
 // ---------- FILTROS Y PAGINACIÓN ----------
-["filtro-yape-estado", "filtro-yape-hermano", "filtro-yape-mes", "filtro-yape-tipo-mov", "filtro-yape-desde", "filtro-yape-hasta", "filtro-yape-orden"].forEach((id) => {
+["filtro-yape-estado", "filtro-yape-hermano", "filtro-yape-anio", "filtro-yape-mes", "filtro-yape-tipo-mov", "filtro-yape-desde", "filtro-yape-hasta", "filtro-yape-orden"].forEach((id) => {
   document.getElementById(id).addEventListener("change", () => {
     yapesFiltro.estado = document.getElementById("filtro-yape-estado").value;
     yapesFiltro.hermano = document.getElementById("filtro-yape-hermano").value;
+    yapesFiltro.anio = document.getElementById("filtro-yape-anio").value;
     yapesFiltro.mes = document.getElementById("filtro-yape-mes").value;
     yapesFiltro.tipoMov = document.getElementById("filtro-yape-tipo-mov").value;
     yapesFiltro.desde = document.getElementById("filtro-yape-desde").value;
@@ -1495,6 +1532,11 @@ document.getElementById("banco-add-btn").addEventListener("click", async () => {
     yapesPagina = 1;
     renderAll();
   });
+});
+document.getElementById("filtro-yape-porpagina").addEventListener("change", () => {
+  yapesPageSize = Number(document.getElementById("filtro-yape-porpagina").value);
+  yapesPagina = 1;
+  renderAll();
 });
 document.getElementById("filtro-yape-numero").addEventListener("input", () => {
   yapesFiltro.numero = document.getElementById("filtro-yape-numero").value.trim();
@@ -1514,8 +1556,9 @@ document.getElementById("filtro-yape-num-cuota").addEventListener("input", () =>
 document.getElementById("yapes-pag-prev").addEventListener("click", () => { yapesPagina = Math.max(1, yapesPagina - 1); renderAll(); });
 document.getElementById("yapes-pag-next").addEventListener("click", () => { yapesPagina += 1; renderAll(); });
 
-["filtro-banco-mes", "filtro-banco-tipo-mov", "filtro-banco-desde", "filtro-banco-hasta", "filtro-banco-orden"].forEach((id) => {
+["filtro-banco-anio", "filtro-banco-mes", "filtro-banco-tipo-mov", "filtro-banco-desde", "filtro-banco-hasta", "filtro-banco-orden"].forEach((id) => {
   document.getElementById(id).addEventListener("change", () => {
+    bancoFiltro.anio = document.getElementById("filtro-banco-anio").value;
     bancoFiltro.mes = document.getElementById("filtro-banco-mes").value;
     bancoFiltro.tipoMov = document.getElementById("filtro-banco-tipo-mov").value;
     bancoFiltro.desde = document.getElementById("filtro-banco-desde").value;
@@ -1524,6 +1567,11 @@ document.getElementById("yapes-pag-next").addEventListener("click", () => { yape
     bancoPagina = 1;
     renderAll();
   });
+});
+document.getElementById("filtro-banco-porpagina").addEventListener("change", () => {
+  bancoPageSize = Number(document.getElementById("filtro-banco-porpagina").value);
+  bancoPagina = 1;
+  renderAll();
 });
 document.getElementById("filtro-banco-numero").addEventListener("input", () => {
   bancoFiltro.numero = document.getElementById("filtro-banco-numero").value.trim();
@@ -1604,6 +1652,87 @@ document.getElementById("excepcion-add-btn").addEventListener("click", async () 
   } finally {
     btn.disabled = false;
     btn.textContent = "Guardar excepción";
+  }
+});
+
+// ---------- CARGA HISTÓRICA 2025 (Cristian + Gustavo, una sola vez) ----------
+document.getElementById("cargar-historico-2025-btn").addEventListener("click", async () => {
+  const confirmado = await mostrarConfirmacion(
+    "Cargar histórico 2025",
+    "Esto va a crear 24 registros nuevos (12 de Cristian + 12 de Gustavo, cuotas 41 a 52 de 2025), ya marcados como Verificado. No lo ejecutes dos veces o se van a duplicar. ¿Confirmas?",
+    "Sí, cargar los 24"
+  );
+  if (!confirmado) return;
+
+  const btn = document.getElementById("cargar-historico-2025-btn");
+  btn.disabled = true;
+  btn.textContent = "Cargando…";
+
+  // Cuota total fue S/1,131.08 todo 2025 (sin prepagos ese año) — Cristian
+  // fijo S/200, Gustavo el resto (931.08). Fecha: 30 de cada mes, 28 en febrero.
+  const meses2025 = [
+    { cuota: 41, fecha: "2025-01-30" },
+    { cuota: 42, fecha: "2025-02-28" },
+    { cuota: 43, fecha: "2025-03-30" },
+    { cuota: 44, fecha: "2025-04-30" },
+    { cuota: 45, fecha: "2025-05-30" },
+    { cuota: 46, fecha: "2025-06-30" },
+    { cuota: 47, fecha: "2025-07-30" },
+    { cuota: 48, fecha: "2025-08-30" },
+    { cuota: 49, fecha: "2025-09-30" },
+    { cuota: 50, fecha: "2025-10-30" },
+    { cuota: 51, fecha: "2025-11-30" },
+    { cuota: 52, fecha: "2025-12-30" },
+  ];
+  const idxCristian = NOMBRES_HERMANOS.indexOf("Cristian Reyna");
+  const idxGustavo = IDX_ADMIN_APORTANTE;
+
+  try {
+    for (const { cuota, fecha } of meses2025) {
+      const mesCorresponde = periodoDeCuota(cuota);
+
+      const numeroCristian = await siguienteNumero("yapes");
+      await addDoc(collection(db, "yapes"), {
+        hermano: idxCristian,
+        medioPago: "otro",
+        motivo: "otros",
+        fechaPago: fecha,
+        mesCorresponde,
+        numeroOperacion: "",
+        numeroCuota: String(cuota),
+        monto: 200,
+        nota: "Pago vía mamá (acuerdo habitual, Cristian en Trujillo) — dado por pagado. Aporte S/. 200",
+        imagenUrl: null,
+        imagenNombre: null,
+        numero: numeroCristian,
+        fechaRegistro: new Date().toISOString(),
+        estado: "verificado",
+      });
+
+      const numeroGustavo = await siguienteNumero("yapes");
+      await addDoc(collection(db, "yapes"), {
+        hermano: idxGustavo,
+        medioPago: "transferencia",
+        motivo: "cuota_mensual",
+        fechaPago: fecha,
+        mesCorresponde,
+        numeroOperacion: "",
+        numeroCuota: String(cuota),
+        monto: 931.08,
+        nota: "Total constancia S/. 1131.08 - Aportes S/. 200 Cristian y S/. 931.08 Gustavo",
+        imagenUrl: null,
+        imagenNombre: null,
+        numero: numeroGustavo,
+        fechaRegistro: new Date().toISOString(),
+        estado: "verificado",
+      });
+    }
+    btn.textContent = "✓ 24 registros cargados";
+  } catch (e) {
+    showError("No se pudo completar la carga histórica.");
+    btn.textContent = "📦 Cargar histórico 2025 (una sola vez)";
+  } finally {
+    btn.disabled = false;
   }
 });
 
@@ -1696,6 +1825,7 @@ document.querySelectorAll(".subtab-btn").forEach((btn) => {
     document.getElementById("subtab-fecha").hidden = sub !== "fecha";
     document.getElementById("subtab-banco-reporte").hidden = sub !== "banco";
     document.getElementById("subtab-grafico").hidden = sub !== "grafico";
+    document.getElementById("subtab-validacion").hidden = sub !== "validacion";
     renderAll();
   });
 });
@@ -1776,6 +1906,108 @@ function poblarSelectCuota(sel, incluirVacio) {
   sel.innerHTML = html;
 }
 
+// Cuota "esperada" para un N° de Cuota: si hay dato real en CRONOGRAMA_REAL
+// (cuotas 1-60, tal como las confirmó Interbank), se usa ese — es un
+// respaldo fijo e independiente de lo que se haya tecleado en la app. Para
+// cuotas más nuevas, se calcula en vivo con el historial de cuota.
+function cuotaEsperada(numeroCuota) {
+  const real = CRONOGRAMA_REAL.find((c) => c.cuota === Number(numeroCuota));
+  if (real) return { ...real, fuente: "Cronograma real" };
+  const periodo = periodoDeCuota(numeroCuota);
+  if (!periodo) return null;
+  // Para cuotas futuras a la 60: el valor vigente según el historial de cuota
+  let valor = config.cuotaActual;
+  const cambiosOrdenados = [...historialCuota].sort((a, b) => (a.fecha < b.fecha ? -1 : 1));
+  for (const h of cambiosOrdenados) {
+    if (h.fecha <= periodo + "-31") valor = h.valor;
+  }
+  return { cuota: Number(numeroCuota), fecha: periodo + "-01", amortizacion: null, interes: null, seguro: null, cuotaTotal: valor, fuente: "Historial de cuota (en vivo)" };
+}
+
+function renderValidacion() {
+  const selAnio = document.getElementById("validacion-anio");
+  if (selAnio.options.length === 0) {
+    const anios = Array.from(new Set(CRONOGRAMA_REAL.map((c) => c.fecha.slice(0, 4))));
+    const anioActual = new Date().getFullYear();
+    for (let a = anioActual + 1; a > Number(anios[0]); a--) { if (!anios.includes(String(a))) anios.push(String(a)); }
+    anios.sort();
+    selAnio.innerHTML = anios.map((a) => `<option value="${a}">${a}</option>`).join("");
+    selAnio.value = String(anioActual);
+  }
+  const selMesDesde = document.getElementById("validacion-mes-desde");
+  const selMesHasta = document.getElementById("validacion-mes-hasta");
+  if (selMesDesde.options.length === 0) {
+    const opcionesMes = MESES_NOMBRE.map((m, i) => `<option value="${String(i + 1).padStart(2, "0")}">${m}</option>`).join("");
+    selMesDesde.innerHTML = opcionesMes;
+    selMesHasta.innerHTML = opcionesMes;
+    selMesDesde.value = "01";
+    selMesHasta.value = "12";
+  }
+
+  const anio = selAnio.value;
+  const mesDesde = selMesDesde.value;
+  const mesHasta = selMesHasta.value;
+  const periodoDesde = `${anio}-${mesDesde}`;
+  const periodoHasta = `${anio}-${mesHasta}`;
+
+  // Arma la lista de cuotas dentro del rango elegido (real + calculadas)
+  const totalCuotas = config.plazoTotalMeses || 120;
+  const filas = [];
+  for (let n = 1; n <= totalCuotas; n++) {
+    const periodo = periodoDeCuota(n);
+    if (!periodo || periodo < periodoDesde || periodo > periodoHasta) continue;
+    const esperada = cuotaEsperada(n);
+    if (!esperada) continue;
+    const registrado = pagosBanco
+      .filter((p) => (p.tipo === "cuota_mensual" || p.tipo === "cuota") && String(p.numeroCuota) === String(n))
+      .reduce((s, p) => s + p.monto, 0);
+    const tieneRegistro = pagosBanco.some((p) => (p.tipo === "cuota_mensual" || p.tipo === "cuota") && String(p.numeroCuota) === String(n));
+    filas.push({ ...esperada, registrado, tieneRegistro });
+  }
+
+  const totalEsperado = filas.reduce((s, f) => s + f.cuotaTotal, 0);
+  const totalRegistrado = filas.reduce((s, f) => s + f.registrado, 0);
+  const diferencia = Math.round((totalRegistrado - totalEsperado) * 100) / 100;
+  const cuadraGlobal = Math.abs(diferencia) < 0.01;
+
+  document.getElementById("validacion-resumen").innerHTML = `
+    <div class="hermano-card">
+      <div class="hermano-nombre">Comparación: ${MESES_NOMBRE[Number(mesDesde) - 1]} a ${MESES_NOMBRE[Number(mesHasta) - 1]} ${anio}</div>
+      <div class="hermano-monto" style="color:${cuadraGlobal ? "var(--sage)" : "#C0392B"};">
+        ${cuadraGlobal ? "✅ Cuadra" : (diferencia > 0 ? `⚠️ Sobra ${formatSoles(diferencia)}` : `⚠️ Falta ${formatSoles(-diferencia)}`)}
+      </div>
+      <div class="hermano-desglose">Esperado según cronograma: ${formatSoles(totalEsperado)} · Registrado en el sistema: ${formatSoles(totalRegistrado)}</div>
+    </div>`;
+
+  const filasHtml = filas.map((f) => {
+    const dif = Math.round((f.registrado - f.cuotaTotal) * 100) / 100;
+    const estadoTexto = !f.tieneRegistro
+      ? `<span style="color:#C0392B;">⚠️ Sin registrar</span>`
+      : Math.abs(dif) < 0.01
+        ? `<span style="color:var(--sage);">✅ Cuadra</span>`
+        : `<span style="color:#C0392B;">⚠️ ${dif > 0 ? "Sobra" : "Falta"} ${formatSoles(Math.abs(dif))}</span>`;
+    return `<tr>
+      <td>${f.cuota}</td>
+      <td>${formatFecha(f.fecha)}</td>
+      <td style="text-align:right;">${f.amortizacion != null ? formatSoles(f.amortizacion) : "—"}</td>
+      <td style="text-align:right;">${f.interes != null ? formatSoles(f.interes) : "—"}</td>
+      <td style="text-align:right;">${f.seguro != null ? formatSoles(f.seguro) : "—"}</td>
+      <td style="text-align:right;font-weight:600;">${formatSoles(f.cuotaTotal)}</td>
+      <td style="text-align:right;">${formatSoles(f.registrado)}</td>
+      <td>${estadoTexto}</td>
+    </tr>`;
+  }).join("");
+
+  document.getElementById("validacion-tabla").innerHTML = `
+    <table class="reporte-table">
+      <thead><tr><th>N°</th><th>Fecha</th><th style="text-align:right;">Amort.</th><th style="text-align:right;">Interés</th><th style="text-align:right;">Seguro</th><th style="text-align:right;">Esperado</th><th style="text-align:right;">Registrado</th><th>Estado</th></tr></thead>
+      <tbody>${filasHtml || `<tr><td colspan="8" class="empty">Sin cuotas en este rango.</td></tr>`}</tbody>
+    </table>`;
+}
+["validacion-anio", "validacion-mes-desde", "validacion-mes-hasta"].forEach((id) => {
+  document.addEventListener("change", (e) => { if (e.target.id === id) renderValidacion(); });
+});
+
 function periodoDe(y) {
   return y.mesCorresponde || (y.fechaPago ? y.fechaPago.slice(0, 7) : "");
 }
@@ -1787,6 +2019,74 @@ function coincideTipo(valorGuardado, filtroTipo) {
   return normalizado === filtroTipo;
 }
 
+
+// Datos REALES del cronograma de Interbank (fijos, no editables) — cuotas 1
+// a 60, tal como aparecen en los documentos oficiales del banco. Sirven de
+// respaldo independiente para validar los pagos registrados, sin depender
+// de lo que se haya tecleado en "historial de cuota". A partir de la cuota
+// 61 (setiembre 2026 en adelante), la validación usa el historial en vivo.
+const CRONOGRAMA_REAL = [
+  {cuota:1,fecha:"2021-09-30",amortizacion:441.41,interes:664.01,seguro:25.66,cuotaTotal:1131.08},
+  {cuota:2,fecha:"2021-10-30",amortizacion:467.06,interes:639.31,seguro:24.71,cuotaTotal:1131.08},
+  {cuota:3,fecha:"2021-11-30",amortizacion:448.48,interes:657.21,seguro:25.39,cuotaTotal:1131.08},
+  {cuota:4,fecha:"2021-12-30",amortizacion:473.95,interes:632.68,seguro:24.45,cuotaTotal:1131.08},
+  {cuota:5,fecha:"2022-01-30",amortizacion:455.65,interes:650.30,seguro:25.13,cuotaTotal:1131.08},
+  {cuota:6,fecha:"2022-02-28",amortizacion:502.69,interes:605.01,seguro:23.38,cuotaTotal:1131.08},
+  {cuota:7,fecha:"2022-03-30",amortizacion:484.73,interes:622.30,seguro:24.05,cuotaTotal:1131.08},
+  {cuota:8,fecha:"2022-04-30",amortizacion:466.88,interes:639.49,seguro:24.71,cuotaTotal:1131.08},
+  {cuota:9,fecha:"2022-05-30",amortizacion:491.89,interes:615.41,seguro:23.78,cuotaTotal:1131.08},
+  {cuota:10,fecha:"2022-06-30",amortizacion:474.34,interes:632.31,seguro:24.43,cuotaTotal:1131.08},
+  {cuota:11,fecha:"2022-07-30",amortizacion:499.16,interes:608.41,seguro:23.51,cuotaTotal:1131.08},
+  {cuota:12,fecha:"2022-08-30",amortizacion:481.91,interes:625.02,seguro:24.15,cuotaTotal:1131.08},
+  {cuota:13,fecha:"2022-09-30",amortizacion:485.65,interes:621.42,seguro:24.01,cuotaTotal:1131.08},
+  {cuota:14,fecha:"2022-10-30",amortizacion:510.20,interes:597.78,seguro:23.10,cuotaTotal:1131.08},
+  {cuota:15,fecha:"2022-11-30",amortizacion:493.40,interes:613.96,seguro:23.72,cuotaTotal:1131.08},
+  {cuota:16,fecha:"2022-12-30",amortizacion:517.75,interes:590.51,seguro:22.82,cuotaTotal:1131.08},
+  {cuota:17,fecha:"2023-01-30",amortizacion:501.26,interes:606.39,seguro:23.43,cuotaTotal:1131.08},
+  {cuota:18,fecha:"2023-02-28",amortizacion:545.68,interes:563.62,seguro:21.78,cuotaTotal:1131.08},
+  {cuota:19,fecha:"2023-03-30",amortizacion:529.53,interes:579.17,seguro:22.38,cuotaTotal:1131.08},
+  {cuota:20,fecha:"2023-04-30",amortizacion:513.53,interes:594.58,seguro:22.97,cuotaTotal:1131.08},
+  {cuota:21,fecha:"2023-05-30",amortizacion:537.38,interes:571.61,seguro:22.09,cuotaTotal:1131.08},
+  {cuota:22,fecha:"2023-06-30",amortizacion:521.70,interes:586.71,seguro:22.67,cuotaTotal:1131.08},
+  {cuota:23,fecha:"2023-07-30",amortizacion:545.35,interes:563.94,seguro:21.79,cuotaTotal:1131.08},
+  {cuota:24,fecha:"2023-08-30",amortizacion:530.00,interes:578.72,seguro:22.36,cuotaTotal:1131.08},
+  {cuota:25,fecha:"2023-09-30",amortizacion:534.12,interes:574.75,seguro:22.21,cuotaTotal:1131.08},
+  {cuota:26,fecha:"2023-10-30",amortizacion:557.46,interes:552.28,seguro:21.34,cuotaTotal:1131.08},
+  {cuota:27,fecha:"2023-11-30",amortizacion:542.61,interes:566.58,seguro:21.89,cuotaTotal:1131.08},
+  {cuota:28,fecha:"2023-12-30",amortizacion:565.75,interes:544.30,seguro:21.03,cuotaTotal:1131.08},
+  {cuota:29,fecha:"2024-01-30",amortizacion:551.23,interes:558.28,seguro:21.57,cuotaTotal:1131.08},
+  {cuota:30,fecha:"2024-02-29",amortizacion:574.15,interes:536.21,seguro:20.72,cuotaTotal:1131.08},
+  {cuota:31,fecha:"2024-03-30",amortizacion:578.47,interes:532.05,seguro:20.56,cuotaTotal:1131.08},
+  {cuota:32,fecha:"2024-04-30",amortizacion:564.48,interes:545.52,seguro:21.08,cuotaTotal:1131.08},
+  {cuota:33,fecha:"2024-05-30",amortizacion:587.07,interes:523.77,seguro:20.24,cuotaTotal:1131.08},
+  {cuota:34,fecha:"2024-06-30",amortizacion:573.44,interes:536.90,seguro:20.74,cuotaTotal:1131.08},
+  {cuota:35,fecha:"2024-07-30",amortizacion:595.80,interes:515.36,seguro:19.92,cuotaTotal:1131.08},
+  {cuota:36,fecha:"2024-08-30",amortizacion:582.53,interes:528.14,seguro:20.41,cuotaTotal:1131.08},
+  {cuota:37,fecha:"2024-09-30",amortizacion:587.06,interes:523.78,seguro:20.24,cuotaTotal:1131.08},
+  {cuota:38,fecha:"2024-10-30",amortizacion:609.09,interes:502.57,seguro:19.42,cuotaTotal:1131.08},
+  {cuota:39,fecha:"2024-11-30",amortizacion:596.37,interes:514.82,seguro:19.89,cuotaTotal:1131.08},
+  {cuota:40,fecha:"2024-12-30",amortizacion:618.17,interes:493.83,seguro:19.08,cuotaTotal:1131.08},
+  {cuota:41,fecha:"2025-01-30",amortizacion:605.81,interes:505.73,seguro:19.54,cuotaTotal:1131.08},
+  {cuota:42,fecha:"2025-02-28",amortizacion:644.22,interes:468.74,seguro:18.12,cuotaTotal:1131.08},
+  {cuota:43,fecha:"2025-03-30",amortizacion:632.22,interes:480.30,seguro:18.56,cuotaTotal:1131.08},
+  {cuota:44,fecha:"2025-04-30",amortizacion:620.45,interes:491.63,seguro:19.00,cuotaTotal:1131.08},
+  {cuota:45,fecha:"2025-05-30",amortizacion:641.65,interes:471.22,seguro:18.21,cuotaTotal:1131.08},
+  {cuota:46,fecha:"2025-06-30",amortizacion:630.27,interes:482.18,seguro:18.63,cuotaTotal:1131.08},
+  {cuota:47,fecha:"2025-07-30",amortizacion:651.23,interes:462.00,seguro:17.85,cuotaTotal:1131.08},
+  {cuota:48,fecha:"2025-08-30",amortizacion:640.23,interes:472.59,seguro:18.26,cuotaTotal:1131.08},
+  {cuota:49,fecha:"2025-09-30",amortizacion:645.22,interes:467.79,seguro:18.07,cuotaTotal:1131.08},
+  {cuota:50,fecha:"2025-10-30",amortizacion:665.80,interes:447.97,seguro:17.31,cuotaTotal:1131.08},
+  {cuota:51,fecha:"2025-11-30",amortizacion:655.41,interes:457.97,seguro:17.70,cuotaTotal:1131.08},
+  {cuota:52,fecha:"2025-12-30",amortizacion:675.74,interes:438.40,seguro:16.94,cuotaTotal:1131.08},
+  {cuota:53,fecha:"2026-01-30",amortizacion:665.76,interes:448.01,seguro:17.31,cuotaTotal:1131.08},
+  {cuota:54,fecha:"2026-02-28",amortizacion:743.03,interes:370.60,seguro:14.33,cuotaTotal:1127.96},
+  {cuota:55,fecha:"2026-03-30",amortizacion:714.27,interes:392.14,seguro:15.16,cuotaTotal:1121.57},
+  {cuota:56,fecha:"2026-04-30",amortizacion:686.73,interes:413.01,seguro:15.96,cuotaTotal:1115.70},
+  {cuota:57,fecha:"2026-05-30",amortizacion:743.22,interes:351.46,seguro:13.59,cuotaTotal:1108.27},
+  {cuota:58,fecha:"2026-06-30",amortizacion:699.78,interes:383.64,seguro:14.83,cuotaTotal:1098.25},
+  {cuota:59,fecha:"2026-07-30",amortizacion:699.57,interes:376.03,seguro:14.53,cuotaTotal:1090.13},
+  {cuota:60,fecha:"2026-08-30",amortizacion:685.35,interes:380.81,seguro:14.72,cuotaTotal:1080.88}
+];
 const MESES_NOMBRE = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
 function construirFilasAportes(filtrado) {
@@ -2149,6 +2449,13 @@ function renderAll() {
     selFiltroHermano.value = prevF;
   }
 
+  // filtro por año (poblado con los años que ya tienen datos)
+  const selFiltroAnio = document.getElementById("filtro-yape-anio");
+  const aniosYapesDisponibles = Array.from(new Set(yapes.map((y) => periodoDe(y).slice(0, 4)).filter(Boolean))).sort();
+  const prevAnioYape = selFiltroAnio.value || "todos";
+  selFiltroAnio.innerHTML = `<option value="todos">Todos los años</option>` + aniosYapesDisponibles.map((a) => `<option value="${a}">${a}</option>`).join("");
+  selFiltroAnio.value = aniosYapesDisponibles.includes(prevAnioYape) ? prevAnioYape : "todos";
+
   // filtro por mes correspondiente (se arma solo con los meses que ya tienen
   // datos, en orden cronológico ascendente, con su N° de Cuota si aplica)
   const selFiltroMes = document.getElementById("filtro-yape-mes");
@@ -2166,6 +2473,7 @@ function renderAll() {
   let yapesFiltrados = yapes.filter((y) => {
     if (yapesFiltro.estado !== "todos" && y.estado !== yapesFiltro.estado) return false;
     if (hermanoFiltroEfectivo !== "todos" && String(y.hermano) !== hermanoFiltroEfectivo) return false;
+    if (yapesFiltro.anio !== "todos" && periodoDe(y).slice(0, 4) !== yapesFiltro.anio) return false;
     if (yapesFiltro.mes !== "todos" && periodoDe(y) !== yapesFiltro.mes) return false;
     if (!coincideTipo(y.motivo, yapesFiltro.tipoMov)) return false;
     if (yapesFiltro.desde && y.fechaPago < yapesFiltro.desde) return false;
@@ -2178,9 +2486,12 @@ function renderAll() {
   yapesFiltrados = ordenarPor(yapesFiltrados, yapesFiltro.orden);
   ultimosYapesFiltrados = yapesFiltrados;
 
-  const totalPagYapes = Math.max(1, Math.ceil(yapesFiltrados.length / PAGE_SIZE));
+  const sumaYapesFiltrados = yapesFiltrados.reduce((s, y) => s + y.monto, 0);
+  document.getElementById("yapes-sumatorio").textContent = `Σ Sumatoria de lo filtrado: ${formatSoles(sumaYapesFiltrados)} (${yapesFiltrados.length} registro${yapesFiltrados.length === 1 ? "" : "s"})`;
+
+  const totalPagYapes = Math.max(1, Math.ceil(yapesFiltrados.length / yapesPageSize));
   if (yapesPagina > totalPagYapes) yapesPagina = totalPagYapes;
-  const yapesPagina_lista = yapesFiltrados.slice((yapesPagina - 1) * PAGE_SIZE, yapesPagina * PAGE_SIZE);
+  const yapesPagina_lista = yapesFiltrados.slice((yapesPagina - 1) * yapesPageSize, yapesPagina * yapesPageSize);
 
   document.getElementById("yapes-pag-info").textContent = yapesFiltrados.length
     ? `Página ${yapesPagina} de ${totalPagYapes} (${yapesFiltrados.length} registros)`
@@ -2263,6 +2574,13 @@ function renderAll() {
   document.getElementById("total-banco-mensual-capital").textContent = formatSoles(dMensual.capital);
   document.getElementById("total-banco-mensual-interes").textContent = formatSoles(dMensual.interes);
 
+  // filtro por año (poblado con los años que ya tienen datos)
+  const selFiltroBancoAnio = document.getElementById("filtro-banco-anio");
+  const aniosBancoHistDisponibles = Array.from(new Set(pagosBanco.map((p) => (p.mesCorresponde || periodoBancoDe(p)).slice(0, 4)).filter(Boolean))).sort();
+  const prevAnioBancoHist = selFiltroBancoAnio.value || "todos";
+  selFiltroBancoAnio.innerHTML = `<option value="todos">Todos los años</option>` + aniosBancoHistDisponibles.map((a) => `<option value="${a}">${a}</option>`).join("");
+  selFiltroBancoAnio.value = aniosBancoHistDisponibles.includes(prevAnioBancoHist) ? prevAnioBancoHist : "todos";
+
   // filtro por mes correspondiente (calculado desde el N° de Cuota si existe),
   // en orden cronológico ascendente
   const selFiltroBancoMes = document.getElementById("filtro-banco-mes");
@@ -2277,6 +2595,7 @@ function renderAll() {
 
   // banco ledger: aplicar filtros
   let bancoFiltrado = pagosBanco.filter((p) => {
+    if (bancoFiltro.anio !== "todos" && (p.mesCorresponde || periodoBancoDe(p)).slice(0, 4) !== bancoFiltro.anio) return false;
     if (bancoFiltro.mes !== "todos" && (p.mesCorresponde || periodoBancoDe(p)) !== bancoFiltro.mes) return false;
     if (!coincideTipo(p.tipo, bancoFiltro.tipoMov)) return false;
     if (bancoFiltro.desde && p.fecha < bancoFiltro.desde) return false;
@@ -2289,9 +2608,12 @@ function renderAll() {
   bancoFiltrado = ordenarPor(bancoFiltrado, bancoFiltro.orden);
   ultimoBancoFiltrado = bancoFiltrado;
 
-  const totalPagBanco = Math.max(1, Math.ceil(bancoFiltrado.length / PAGE_SIZE));
+  const sumaBancoFiltrado = bancoFiltrado.reduce((s, p) => s + p.monto, 0);
+  document.getElementById("banco-sumatorio").textContent = `Σ Sumatoria de lo filtrado: ${formatSoles(sumaBancoFiltrado)} (${bancoFiltrado.length} registro${bancoFiltrado.length === 1 ? "" : "s"})`;
+
+  const totalPagBanco = Math.max(1, Math.ceil(bancoFiltrado.length / bancoPageSize));
   if (bancoPagina > totalPagBanco) bancoPagina = totalPagBanco;
-  const bancoPagina_lista = bancoFiltrado.slice((bancoPagina - 1) * PAGE_SIZE, bancoPagina * PAGE_SIZE);
+  const bancoPagina_lista = bancoFiltrado.slice((bancoPagina - 1) * bancoPageSize, bancoPagina * bancoPageSize);
 
   document.getElementById("banco-pag-info").textContent = bancoFiltrado.length
     ? `Página ${bancoPagina} de ${totalPagBanco} (${bancoFiltrado.length} registros)`
@@ -2367,10 +2689,21 @@ function renderAll() {
   dibujarGraficoCuota();
   renderReporteListado();
   renderReporteFecha();
-  if (rol.tipo !== "hermano") renderReportePagosBanco();
+  if (rol.tipo !== "hermano") { renderReportePagosBanco(); renderValidacion(); }
 }
 
 // event delegation for ledger buttons
+// Marca visualmente la fila que se está mirando/editando, para no perder el
+// hilo entre tantos registros — es solo un resaltado, no dispara ninguna acción.
+document.addEventListener("click", (e) => {
+  if (e.target.closest("button, a, select, input, details, summary, textarea")) return;
+  const fila = e.target.closest(".ledger-row");
+  if (!fila) return;
+  const yaEstaba = fila.classList.contains("fila-seleccionada");
+  document.querySelectorAll(".ledger-row.fila-seleccionada").forEach((f) => f.classList.remove("fila-seleccionada"));
+  if (!yaEstaba) fila.classList.add("fila-seleccionada");
+});
+
 document.addEventListener("click", async (e) => {
   const btn = e.target.closest("button[data-action]");
   if (!btn) return;
