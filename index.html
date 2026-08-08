@@ -517,15 +517,15 @@
           <button class="export-btn" id="export-yapes-btn">⬇ Exportar a CSV</button>
         </div>
         <div class="filtros-row">
+          <select id="filtro-yape-anio"></select>
+          <select id="filtro-yape-mes"></select>
+          <select id="filtro-yape-tipo-mov"></select>
           <select id="filtro-yape-estado">
             <option value="todos">Todos los estados</option>
             <option value="verificado">Verificado</option>
             <option value="pendiente" selected>Pendiente</option>
             <option value="pagado">Pagado</option>
           </select>
-          <select id="filtro-yape-anio"></select>
-          <select id="filtro-yape-mes"></select>
-          <select id="filtro-yape-tipo-mov"></select>
           <select id="filtro-yape-hermano"></select>
           <input id="filtro-yape-desde" type="date" title="Desde" />
           <input id="filtro-yape-hasta" type="date" title="Hasta" />
@@ -673,8 +673,8 @@
           <button class="subtab-btn active" data-subtab="listado" id="subtab-btn-listado">📋 Listado General</button>
           <button class="subtab-btn" data-subtab="fecha" id="subtab-btn-fecha">📆 Listado General x Fecha</button>
           <button class="subtab-btn" data-subtab="banco" id="subtab-btn-banco-reporte">🏦 Pagos Banco</button>
-          <button class="subtab-btn" data-subtab="grafico" id="subtab-btn-grafico">📉 Gráfico</button>
           <button class="subtab-btn" data-subtab="validacion" id="subtab-btn-validacion">✅ Validación</button>
+          <button class="subtab-btn" data-subtab="grafico" id="subtab-btn-grafico">📉 Gráfico</button>
         </div>
 
         <!-- LISTADO GENERAL (por mes/año) -->
@@ -897,6 +897,8 @@ let tabsAbiertas = []; // índices de personas con una pestaña dinámica abiert
 let ultimosYapesFiltrados = [];
 let ultimoBancoFiltrado = [];
 let ultimoReporteListado = { filtrado: [], total: 0, totalVerificado: 0 };
+let reporteAnioListo = false;
+let reporteBancoAnioListo = false;
 let ultimoReporteFecha = { filtrado: [], total: 0, totalVerificado: 0 };
 let ultimoReportePagosBanco = { filtrado: [], total: 0, totalCapital: 0, totalInteres: 0 };
 let historialCronograma = [];
@@ -2661,10 +2663,16 @@ function renderReporteListado() {
       MESES_NOMBRE.map((m, i) => `<option value="${String(i + 1).padStart(2, "0")}">${String(i + 1).padStart(2, "0")} - ${m}</option>`).join("");
   }
   const selAnio = document.getElementById("reporte-anio");
-  const aniosDisponibles = Array.from(new Set(yapes.map((y) => periodoDe(y).slice(0, 4)).filter(Boolean))).sort();
-  const prevAnio = selAnio.value || "todos";
+  const aniosDisponibles = Array.from(new Set(yapes.map((y) => periodoDe(y).slice(0, 4)).filter(Boolean))).sort().reverse();
   selAnio.innerHTML = `<option value="todos">Todos los años</option>` + aniosDisponibles.map((a) => `<option value="${a}">${a}</option>`).join("");
-  selAnio.value = aniosDisponibles.includes(prevAnio) ? prevAnio : "todos";
+  if (!reporteAnioListo && aniosDisponibles.length > 0) {
+    const anioActual = String(new Date().getFullYear());
+    selAnio.value = aniosDisponibles.includes(anioActual) ? anioActual : "todos";
+    reporteAnioListo = true;
+  } else {
+    const prevAnio = selAnio.value || "todos";
+    selAnio.value = aniosDisponibles.includes(prevAnio) ? prevAnio : "todos";
+  }
 
   const selPersona = document.getElementById("reporte-persona");
   if (rol.tipo === "hermano") {
@@ -2761,10 +2769,16 @@ function renderReportePagosBanco() {
       MESES_NOMBRE.map((m, i) => `<option value="${String(i + 1).padStart(2, "0")}">${String(i + 1).padStart(2, "0")} - ${m}</option>`).join("");
   }
   const selAnio = document.getElementById("reporte-banco-anio");
-  const aniosBancoDisponibles = Array.from(new Set(pagosBanco.map((p) => (p.mesCorresponde || periodoBancoDe(p)).slice(0, 4)).filter(Boolean))).sort();
-  const prevAnioBanco = selAnio.value || "todos";
+  const aniosBancoDisponibles = Array.from(new Set(pagosBanco.map((p) => (p.mesCorresponde || periodoBancoDe(p)).slice(0, 4)).filter(Boolean))).sort().reverse();
   selAnio.innerHTML = `<option value="todos">Todos los años</option>` + aniosBancoDisponibles.map((a) => `<option value="${a}">${a}</option>`).join("");
-  selAnio.value = aniosBancoDisponibles.includes(prevAnioBanco) ? prevAnioBanco : "todos";
+  if (!reporteBancoAnioListo && aniosBancoDisponibles.length > 0) {
+    const anioActual = String(new Date().getFullYear());
+    selAnio.value = aniosBancoDisponibles.includes(anioActual) ? anioActual : "todos";
+    reporteBancoAnioListo = true;
+  } else {
+    const prevAnioBanco = selAnio.value || "todos";
+    selAnio.value = aniosBancoDisponibles.includes(prevAnioBanco) ? prevAnioBanco : "todos";
+  }
 
   const desde = document.getElementById("reporte-banco-desde").value;
   const hasta = document.getElementById("reporte-banco-hasta").value;
@@ -2991,15 +3005,17 @@ function renderAll() {
 
   // filtro por año (poblado con los años que ya tienen datos)
   const selFiltroAnio = document.getElementById("filtro-yape-anio");
-  const aniosYapesDisponibles = Array.from(new Set(yapes.map((y) => periodoDe(y).slice(0, 4)).filter(Boolean))).sort();
+  const aniosYapesDisponibles = Array.from(new Set(yapes.map((y) => periodoDe(y).slice(0, 4)).filter(Boolean))).sort().reverse();
   if (aniosYapesDisponibles.length > 0 && !aniosYapesDisponibles.includes(yapesFiltro.anio)) yapesFiltro.anio = "todos";
   selFiltroAnio.innerHTML = `<option value="todos">Todos los años</option>` + aniosYapesDisponibles.map((a) => `<option value="${a}">${a}</option>`).join("");
   selFiltroAnio.value = yapesFiltro.anio;
 
-  // filtro por mes correspondiente (se arma solo con los meses que ya tienen
-  // datos, en orden cronológico ascendente, con su N° de Cuota si aplica)
+  // filtro por mes correspondiente (se arma solo con los meses del año
+  // elegido, para no mezclar meses de otros años — en orden ascendente)
   const selFiltroMes = document.getElementById("filtro-yape-mes");
-  const mesesDisponibles = Array.from(new Set(yapes.map((y) => periodoDe(y)).filter(Boolean))).sort();
+  const mesesDisponibles = Array.from(new Set(
+    yapes.map((y) => periodoDe(y)).filter((p) => p && (yapesFiltro.anio === "todos" || p.slice(0, 4) === yapesFiltro.anio))
+  )).sort();
   if (mesesDisponibles.length > 0 && !mesesDisponibles.includes(yapesFiltro.mes)) yapesFiltro.mes = "todos";
   selFiltroMes.innerHTML = `<option value="todos">Todos los meses</option>` +
     mesesDisponibles.map((m) => `<option value="${m}">${etiquetaPeriodo(m)}</option>`).join("");
@@ -3116,15 +3132,17 @@ function renderAll() {
 
   // filtro por año (poblado con los años que ya tienen datos)
   const selFiltroBancoAnio = document.getElementById("filtro-banco-anio");
-  const aniosBancoHistDisponibles = Array.from(new Set(pagosBanco.map((p) => (p.mesCorresponde || periodoBancoDe(p)).slice(0, 4)).filter(Boolean))).sort();
+  const aniosBancoHistDisponibles = Array.from(new Set(pagosBanco.map((p) => (p.mesCorresponde || periodoBancoDe(p)).slice(0, 4)).filter(Boolean))).sort().reverse();
   if (aniosBancoHistDisponibles.length > 0 && !aniosBancoHistDisponibles.includes(bancoFiltro.anio)) bancoFiltro.anio = "todos";
   selFiltroBancoAnio.innerHTML = `<option value="todos">Todos los años</option>` + aniosBancoHistDisponibles.map((a) => `<option value="${a}">${a}</option>`).join("");
   selFiltroBancoAnio.value = bancoFiltro.anio;
 
   // filtro por mes correspondiente (calculado desde el N° de Cuota si existe),
-  // en orden cronológico ascendente
+  // solo con los meses del año elegido — en orden ascendente
   const selFiltroBancoMes = document.getElementById("filtro-banco-mes");
-  const mesesBancoDisponibles = Array.from(new Set(pagosBanco.map((p) => p.mesCorresponde || periodoBancoDe(p)).filter(Boolean))).sort();
+  const mesesBancoDisponibles = Array.from(new Set(
+    pagosBanco.map((p) => p.mesCorresponde || periodoBancoDe(p)).filter((p) => p && (bancoFiltro.anio === "todos" || p.slice(0, 4) === bancoFiltro.anio))
+  )).sort();
   if (mesesBancoDisponibles.length > 0 && !mesesBancoDisponibles.includes(bancoFiltro.mes)) bancoFiltro.mes = "todos";
   selFiltroBancoMes.innerHTML = `<option value="todos">Todos los meses</option>` +
     mesesBancoDisponibles.map((m) => `<option value="${m}">${etiquetaPeriodo(m)}</option>`).join("");
