@@ -1976,14 +1976,14 @@ function cuotaEsperada(numeroCuota) {
 }
 
 function renderValidacion() {
+  const MAX_PERIODO_VALIDABLE = CRONOGRAMA_REAL[CRONOGRAMA_REAL.length - 1].fecha.slice(0, 7); // "2026-08"
   const selAnio = document.getElementById("validacion-anio");
   if (selAnio.options.length === 0) {
-    const anios = Array.from(new Set(CRONOGRAMA_REAL.map((c) => c.fecha.slice(0, 4))));
-    const anioActual = new Date().getFullYear();
-    for (let a = anioActual + 1; a > Number(anios[0]); a--) { if (!anios.includes(String(a))) anios.push(String(a)); }
-    anios.sort();
+    // Solo años que ya tienen cronograma real confirmado — nada a futuro,
+    // porque no hay nada que validar todavía en meses que no han pasado.
+    const anios = Array.from(new Set(CRONOGRAMA_REAL.map((c) => c.fecha.slice(0, 4)))).sort();
     selAnio.innerHTML = anios.map((a) => `<option value="${a}">${a}</option>`).join("");
-    selAnio.value = String(anioActual);
+    selAnio.value = MAX_PERIODO_VALIDABLE.slice(0, 4);
   }
   const selMesDesde = document.getElementById("validacion-mes-desde");
   const selMesHasta = document.getElementById("validacion-mes-hasta");
@@ -1992,14 +1992,20 @@ function renderValidacion() {
     selMesDesde.innerHTML = opcionesMes;
     selMesHasta.innerHTML = opcionesMes;
     selMesDesde.value = "01";
-    selMesHasta.value = "12";
+    selMesHasta.value = MAX_PERIODO_VALIDABLE.slice(5, 7);
   }
 
   const anio = selAnio.value;
   const mesDesde = selMesDesde.value;
-  const mesHasta = selMesHasta.value;
-  const periodoDesde = `${anio}-${mesDesde}`;
-  const periodoHasta = `${anio}-${mesHasta}`;
+  let mesHasta = selMesHasta.value;
+  let periodoDesde = `${anio}-${mesDesde}`;
+  let periodoHasta = `${anio}-${mesHasta}`;
+  // Nunca se valida más allá del último cronograma real confirmado
+  if (periodoHasta > MAX_PERIODO_VALIDABLE) {
+    periodoHasta = MAX_PERIODO_VALIDABLE;
+    mesHasta = MAX_PERIODO_VALIDABLE.slice(5, 7);
+  }
+  if (periodoDesde > periodoHasta) periodoDesde = periodoHasta;
 
   // Arma la lista de cuotas dentro del rango elegido (real + calculadas)
   const totalCuotas = config.plazoTotalMeses || 120;
@@ -2062,9 +2068,12 @@ function renderValidacion() {
   });
   const filasPrepagos = prepagosEnRango.map((p) => {
     const t = CATEGORIAS[p.tipo] || CATEGORIAS.otros;
-    const coincide = pagosBanco.find((pb) =>
-      pb.fecha === p.fecha && Math.abs(pb.monto - p.monto) < 0.01 && (pb.tipo === p.tipo)
-    );
+    const coincide = pagosBanco.find((pb) => {
+      if (pb.tipo !== p.tipo) return false;
+      if (p.numeroOperacion && pb.numeroOperacion && pb.numeroOperacion === p.numeroOperacion) return true;
+      const diffDias = Math.abs((new Date(pb.fecha) - new Date(p.fecha)) / 86400000);
+      return diffDias <= 7 && Math.abs(pb.monto - p.monto) < 0.01;
+    });
     const estadoTexto = coincide
       ? `<span style="color:var(--sage);">✅ Registrado (N° Registro ${formatNumero(coincide.numero)})</span>`
       : `<span style="color:#C0392B;">⚠️ Sin registrar en Pagos al Banco</span>`;
@@ -2080,9 +2089,13 @@ function renderValidacion() {
   }).join("");
 
   const totalPrepagosEsperado = prepagosEnRango.reduce((s, p) => s + p.monto, 0);
-  const prepagosSinRegistrar = prepagosEnRango.filter((p) =>
-    !pagosBanco.some((pb) => pb.fecha === p.fecha && Math.abs(pb.monto - p.monto) < 0.01 && pb.tipo === p.tipo)
-  ).length;
+  const existeCoincidenciaPrepago = (p) => pagosBanco.some((pb) => {
+    if (pb.tipo !== p.tipo) return false;
+    if (p.numeroOperacion && pb.numeroOperacion && pb.numeroOperacion === p.numeroOperacion) return true;
+    const diffDias = Math.abs((new Date(pb.fecha) - new Date(p.fecha)) / 86400000);
+    return diffDias <= 7 && Math.abs(pb.monto - p.monto) < 0.01;
+  });
+  const prepagosSinRegistrar = prepagosEnRango.filter((p) => !existeCoincidenciaPrepago(p)).length;
 
   const htmlPrepagos = `
     <div class="section-label" style="margin-top:18px;">💵 PREPAGOS REALES (confirmados por Interbank)</div>
@@ -2103,9 +2116,10 @@ function renderValidacion() {
 
 // ---------- PESTAÑA CRONOGRAMA (solo consulta) ----------
 function renderCronogramaTab() {
+  const CUOTAS_COMPLETO = [...CRONOGRAMA_REAL, ...CRONOGRAMA_PROYECTADO];
   const selAnio = document.getElementById("cronograma-tab-anio");
   if (selAnio.options.length === 0) {
-    const anios = Array.from(new Set(CRONOGRAMA_REAL.map((c) => c.fecha.slice(0, 4))));
+    const anios = Array.from(new Set(CUOTAS_COMPLETO.map((c) => c.fecha.slice(0, 4))));
     selAnio.innerHTML = `<option value="todos">Todos los años</option>` + anios.map((a) => `<option value="${a}">${a}</option>`).join("");
     selAnio.value = "todos";
   }
@@ -2118,8 +2132,9 @@ function renderCronogramaTab() {
 
   const anio = selAnio.value || "todos";
   const mes = selMes.value || "todos";
+  const ultimoPeriodoReal = CRONOGRAMA_REAL[CRONOGRAMA_REAL.length - 1].fecha.slice(0, 7); // "2026-08"
 
-  const cuotasFiltradas = CRONOGRAMA_REAL.filter((c) => {
+  const cuotasFiltradas = CUOTAS_COMPLETO.filter((c) => {
     if (anio !== "todos" && c.fecha.slice(0, 4) !== anio) return false;
     if (mes !== "todos" && c.fecha.slice(5, 7) !== mes) return false;
     return true;
@@ -2137,17 +2152,21 @@ function renderCronogramaTab() {
       <div class="hermano-nombre">Cronograma oficial de Interbank — ${anio === "todos" ? "todos los años" : anio}${mes !== "todos" ? " · " + MESES_NOMBRE[Number(mes) - 1] : ""}</div>
       <div class="hermano-monto">${formatSoles(totalCuotas + totalPrepagos)}</div>
       <div class="hermano-desglose">${cuotasFiltradas.length} cuota(s) por ${formatSoles(totalCuotas)} · ${prepagosFiltrados.length} prepago(s) por ${formatSoles(totalPrepagos)}</div>
+      <div class="hermano-desglose" style="margin-top:4px;">Las cuotas hasta agosto 2026 son reales (confirmadas por Interbank) — de setiembre 2026 en adelante son <strong>proyectadas</strong> (según el cronograma del 04/08/2026, asumiendo que no se hacen más prepagos; van a cambiar cada vez que prepagues más).</div>
     </div>`;
 
-  const filasCuotas = cuotasFiltradas.map((c) => `<tr>
+  const filasCuotas = cuotasFiltradas.map((c) => {
+    const esProyectada = c.fecha.slice(0, 7) > ultimoPeriodoReal;
+    return `<tr${esProyectada ? ' style="color:var(--muted);font-style:italic;"' : ""}>
     <td>Cuota ${c.cuota}</td>
     <td>${formatFecha(c.fecha)}</td>
-    <td>Cuota Mensual</td>
+    <td>${esProyectada ? "Proyectada" : "Cuota Mensual"}</td>
     <td style="text-align:right;">${formatSoles(c.amortizacion)}</td>
     <td style="text-align:right;">${formatSoles(c.interes)}</td>
     <td style="text-align:right;">${formatSoles(c.seguro)}</td>
     <td style="text-align:right;font-weight:600;">${formatSoles(c.cuotaTotal)}</td>
-  </tr>`);
+  </tr>`;
+  });
   const filasPrepagos = prepagosFiltrados.map((p) => {
     const t = CATEGORIAS[p.tipo] || CATEGORIAS.otros;
     return `<tr style="background:#FBF6EA;">
@@ -2254,13 +2273,79 @@ const CRONOGRAMA_REAL = [
 // Prepagos REALES confirmados por Interbank (fijos, tal cual los comprobantes)
 const PREPAGOS_REALES = [
   {fecha:"2026-02-02",tipo:"reduccion_cuota",amortizacion:118.61,interes:42.73,seguro:1.66,monto:163.00},
-  {fecha:"2026-03-02",tipo:"reduccion_cuota",amortizacion:300.84,interes:28.07,seguro:1.09,monto:330.00},
+  {fecha:"2026-03-02",tipo:"reduccion_cuota",amortizacion:300.84,interes:28.07,seguro:1.09,monto:330.00,numeroOperacion:"00505933"},
   {fecha:"2026-03-31",tipo:"reduccion_cuota",amortizacion:285.68,interes:13.79,seguro:0.53,monto:300.00},
-  {fecha:"2026-05-04",tipo:"reduccion_cuota",amortizacion:318.67,interes:54.23,seguro:2.10,monto:375.00},
+  {fecha:"2026-05-04",tipo:"reduccion_cuota",amortizacion:318.67,interes:54.23,seguro:2.10,monto:375.00,numeroOperacion:"00134276"},
   {fecha:"2026-05-29",tipo:"reduccion_plazo",amortizacion:255.00,interes:0.00,seguro:0.00,monto:255.00},
   {fecha:"2026-06-01",tipo:"reduccion_cuota",amortizacion:217.49,interes:26.48,seguro:1.03,monto:245.00},
   {fecha:"2026-07-01",tipo:"reduccion_cuota",amortizacion:386.48,interes:13.02,seguro:0.50,monto:400.00},
   {fecha:"2026-07-31",tipo:"reduccion_cuota",amortizacion:436.76,interes:12.75,seguro:0.49,monto:450.00},
+];
+// Cronograma PROYECTADO (cuotas 61-120), tal como lo recalculó Interbank en
+// el reporte del 04/08/2026 — asume que no se hacen más prepagos de aquí en
+// adelante. Es la "foto" de ese momento, solo para referencia visual en la
+// pestaña Cronograma; no se usa en Validación (esas cuotas son futuras).
+const CRONOGRAMA_PROYECTADO = [
+  {cuota:61,fecha:"2026-09-30",amortizacion:677.45,interes:388.42,seguro:15.01,cuotaTotal:1080.88},
+  {cuota:62,fecha:"2026-10-30",amortizacion:695.61,interes:370.94,seguro:14.33,cuotaTotal:1080.88},
+  {cuota:63,fecha:"2026-11-30",amortizacion:688.13,interes:378.14,seguro:14.61,cuotaTotal:1080.88},
+  {cuota:64,fecha:"2026-12-30",amortizacion:706.02,interes:360.91,seguro:13.95,cuotaTotal:1080.88},
+  {cuota:65,fecha:"2027-01-30",amortizacion:698.97,interes:367.70,seguro:14.21,cuotaTotal:1080.88},
+  {cuota:66,fecha:"2027-02-28",amortizacion:728.78,interes:339.00,seguro:13.10,cuotaTotal:1080.88},
+  {cuota:67,fecha:"2027-03-30",amortizacion:722.08,interes:345.45,seguro:13.35,cuotaTotal:1080.88},
+  {cuota:68,fecha:"2027-04-30",amortizacion:715.69,interes:351.60,seguro:13.59,cuotaTotal:1080.88},
+  {cuota:69,fecha:"2027-05-30",amortizacion:732.90,interes:335.03,seguro:12.95,cuotaTotal:1080.88},
+  {cuota:70,fecha:"2027-06-30",amortizacion:726.96,interes:340.75,seguro:13.17,cuotaTotal:1080.88},
+  {cuota:71,fecha:"2027-07-30",amortizacion:743.89,interes:324.45,seguro:12.54,cuotaTotal:1080.88},
+  {cuota:72,fecha:"2027-08-30",amortizacion:738.40,interes:329.74,seguro:12.74,cuotaTotal:1080.88},
+  {cuota:73,fecha:"2027-09-30",amortizacion:744.14,interes:324.21,seguro:12.53,cuotaTotal:1080.88},
+  {cuota:74,fecha:"2027-10-30",amortizacion:760.65,interes:308.32,seguro:11.91,cuotaTotal:1080.88},
+  {cuota:75,fecha:"2027-11-30",amortizacion:755.85,interes:312.94,seguro:12.09,cuotaTotal:1080.88},
+  {cuota:76,fecha:"2027-12-30",amortizacion:772.06,interes:297.33,seguro:11.49,cuotaTotal:1080.88},
+  {cuota:77,fecha:"2028-01-30",amortizacion:767.73,interes:301.50,seguro:11.65,cuotaTotal:1080.88},
+  {cuota:78,fecha:"2028-02-29",amortizacion:783.64,interes:286.18,seguro:11.06,cuotaTotal:1080.88},
+  {cuota:79,fecha:"2028-03-30",amortizacion:789.54,interes:280.50,seguro:10.84,cuotaTotal:1080.88},
+  {cuota:80,fecha:"2028-04-30",amortizacion:785.94,interes:283.97,seguro:10.97,cuotaTotal:1080.88},
+  {cuota:81,fecha:"2028-05-30",amortizacion:801.40,interes:269.08,seguro:10.40,cuotaTotal:1080.88},
+  {cuota:82,fecha:"2028-06-30",amortizacion:798.29,interes:272.08,seguro:10.51,cuotaTotal:1080.88},
+  {cuota:83,fecha:"2028-07-30",amortizacion:813.44,interes:257.49,seguro:9.95,cuotaTotal:1080.88},
+  {cuota:84,fecha:"2028-08-30",amortizacion:810.81,interes:260.02,seguro:10.05,cuotaTotal:1080.88},
+  {cuota:85,fecha:"2028-09-30",amortizacion:817.13,interes:253.94,seguro:9.81,cuotaTotal:1080.88},
+  {cuota:86,fecha:"2028-10-30",amortizacion:831.81,interes:239.80,seguro:9.27,cuotaTotal:1080.88},
+  {cuota:87,fecha:"2028-11-30",amortizacion:829.95,interes:241.60,seguro:9.33,cuotaTotal:1080.88},
+  {cuota:88,fecha:"2028-12-30",amortizacion:844.32,interes:227.76,seguro:8.80,cuotaTotal:1080.88},
+  {cuota:89,fecha:"2029-01-30",amortizacion:842.97,interes:229.06,seguro:8.85,cuotaTotal:1080.88},
+  {cuota:90,fecha:"2029-02-28",amortizacion:864.50,interes:208.33,seguro:8.05,cuotaTotal:1080.88},
+  {cuota:91,fecha:"2029-03-30",amortizacion:863.52,interes:209.27,seguro:8.09,cuotaTotal:1080.88},
+  {cuota:92,fecha:"2029-04-30",amortizacion:862.96,interes:209.81,seguro:8.11,cuotaTotal:1080.88},
+  {cuota:93,fecha:"2029-05-30",amortizacion:876.52,interes:196.76,seguro:7.60,cuotaTotal:1080.88},
+  {cuota:94,fecha:"2029-06-30",amortizacion:876.50,interes:196.78,seguro:7.60,cuotaTotal:1080.88},
+  {cuota:95,fecha:"2029-07-30",amortizacion:889.71,interes:184.06,seguro:7.11,cuotaTotal:1080.88},
+  {cuota:96,fecha:"2029-08-30",amortizacion:890.23,interes:183.56,seguro:7.09,cuotaTotal:1080.88},
+  {cuota:97,fecha:"2029-09-30",amortizacion:897.16,interes:176.89,seguro:6.83,cuotaTotal:1080.88},
+  {cuota:98,fecha:"2029-10-30",amortizacion:909.86,interes:164.66,seguro:6.36,cuotaTotal:1080.88},
+  {cuota:99,fecha:"2029-11-30",amortizacion:911.21,interes:163.36,seguro:6.31,cuotaTotal:1080.88},
+  {cuota:100,fecha:"2029-12-30",amortizacion:923.56,interes:151.47,seguro:5.85,cuotaTotal:1080.88},
+  {cuota:101,fecha:"2030-01-30",amortizacion:925.48,interes:149.62,seguro:5.78,cuotaTotal:1080.88},
+  {cuota:102,fecha:"2030-02-28",amortizacion:942.27,interes:133.45,seguro:5.16,cuotaTotal:1080.88},
+  {cuota:103,fecha:"2030-03-30",amortizacion:944.57,interes:131.24,seguro:5.07,cuotaTotal:1080.88},
+  {cuota:104,fecha:"2030-04-30",amortizacion:947.35,interes:128.56,seguro:4.97,cuotaTotal:1080.88},
+  {cuota:105,fecha:"2030-05-30",amortizacion:958.81,interes:117.53,seguro:4.54,cuotaTotal:1080.88},
+  {cuota:106,fecha:"2030-06-30",amortizacion:962.17,interes:114.29,seguro:4.42,cuotaTotal:1080.88},
+  {cuota:107,fecha:"2030-07-30",amortizacion:973.27,interes:103.61,seguro:4.00,cuotaTotal:1080.88},
+  {cuota:108,fecha:"2030-08-30",amortizacion:977.23,interes:99.79,seguro:3.86,cuotaTotal:1080.88},
+  {cuota:109,fecha:"2030-09-30",amortizacion:984.84,interes:92.47,seguro:3.57,cuotaTotal:1080.88},
+  {cuota:110,fecha:"2030-10-30",amortizacion:995.36,interes:82.34,seguro:3.18,cuotaTotal:1080.88},
+  {cuota:111,fecha:"2030-11-30",amortizacion:1000.23,interes:77.65,seguro:3.00,cuotaTotal:1080.88},
+  {cuota:112,fecha:"2030-12-30",amortizacion:1010.38,interes:67.88,seguro:2.62,cuotaTotal:1080.88},
+  {cuota:113,fecha:"2031-01-30",amortizacion:1015.87,interes:62.59,seguro:2.42,cuotaTotal:1080.88},
+  {cuota:114,fecha:"2031-02-28",amortizacion:1027.47,interes:51.42,seguro:1.99,cuotaTotal:1080.88},
+  {cuota:115,fecha:"2031-03-30",amortizacion:1033.35,interes:45.76,seguro:1.77,cuotaTotal:1080.88},
+  {cuota:116,fecha:"2031-04-30",amortizacion:1039.80,interes:39.55,seguro:1.53,cuotaTotal:1080.88},
+  {cuota:117,fecha:"2031-05-30",amortizacion:1048.95,interes:30.74,seguro:1.19,cuotaTotal:1080.88},
+  {cuota:118,fecha:"2031-06-30",amortizacion:1056.05,interes:23.91,seguro:0.92,cuotaTotal:1080.88},
+  {cuota:119,fecha:"2031-07-30",amortizacion:1064.80,interes:15.48,seguro:0.60,cuotaTotal:1080.88},
+  {cuota:120,fecha:"2031-08-30",amortizacion:1072.16,interes:8.03,seguro:0.31,cuotaTotal:1080.50}
 ];
 const MESES_NOMBRE = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
