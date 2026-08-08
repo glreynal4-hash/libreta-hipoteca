@@ -998,6 +998,21 @@ function mostrarConfirmacion(titulo, mensaje, textoConfirmar) {
     confirmBtn.addEventListener("click", onConfirm);
   });
 }
+
+// Valida que la Fecha de Vencimiento corresponda al mes real del N° de
+// Cuota elegido — para atrapar el típico error de dedo (ej. poner 2026 en
+// vez de 2025). Si no coinciden, pide confirmar antes de seguir.
+async function validarFechaVencimiento(numeroCuota, fechaVencimiento) {
+  if (!numeroCuota || !fechaVencimiento) return true;
+  const periodoEsperado = periodoDeCuota(numeroCuota);
+  const periodoIngresado = fechaVencimiento.slice(0, 7);
+  if (!periodoEsperado || periodoEsperado === periodoIngresado) return true;
+  return mostrarConfirmacion(
+    "Revisa la fecha de vencimiento",
+    `La Cuota N°${numeroCuota} corresponde a ${nombrePeriodo(periodoEsperado)}, pero pusiste como vencimiento ${formatFecha(fechaVencimiento)} (${nombrePeriodo(periodoIngresado)}). ¿Es correcto?`,
+    "Sí, es correcto"
+  );
+}
 function confirmarEliminar() {
   return mostrarConfirmacion("Eliminar registro", "¿Seguro que quieres eliminar este registro? Esta acción no se puede deshacer.", "Eliminar");
 }
@@ -1561,6 +1576,14 @@ document.getElementById("yape-add-btn").addEventListener("click", async () => {
     if (!confirmado) return;
   }
 
+  // Si además vas a generar el pago al banco, valida su fecha de vencimiento
+  // contra la misma Cuota (mismo tipo de error de dedo que arriba).
+  const checkGenerarPagoPrevio = document.getElementById("yape-generar-pago-check");
+  if (checkGenerarPagoPrevio.checked && !checkGenerarPagoPrevio.disabled) {
+    const fechaVencPrevia = document.getElementById("yape-generar-pago-fecha-venc").value;
+    if (!(await validarFechaVencimiento(numeroCuotaYape, fechaVencPrevia))) return;
+  }
+
   const fileInput = document.getElementById("yape-imagen");
   const file = fileInput.files[0] || null;
   const btn = document.getElementById("yape-add-btn");
@@ -1721,6 +1744,10 @@ document.getElementById("banco-add-btn").addEventListener("click", async () => {
   if (!monto || monto <= 0) return;
   const capitalVal = document.getElementById("banco-capital").value;
   const fecha = document.getElementById("banco-fecha").value;
+  const numeroCuotaBancoValidar = document.getElementById("banco-num-cuota").value;
+  const fechaVencBancoValidar = document.getElementById("banco-fecha-vencimiento").value;
+  if (!(await validarFechaVencimiento(numeroCuotaBancoValidar, fechaVencBancoValidar))) return;
+
   const fileInput = document.getElementById("banco-imagen");
   const fileInput2 = document.getElementById("banco-imagen2");
   const file = fileInput.files[0] || null;
@@ -2374,8 +2401,9 @@ function renderCronogramaTab() {
   const selAnio = document.getElementById("cronograma-tab-anio");
   if (selAnio.options.length === 0) {
     const anios = Array.from(new Set(CUOTAS_COMPLETO.map((c) => c.fecha.slice(0, 4))));
+    const anioActualStr = String(new Date().getFullYear());
     selAnio.innerHTML = `<option value="todos">Todos los años</option>` + anios.map((a) => `<option value="${a}">${a}</option>`).join("");
-    selAnio.value = "todos";
+    selAnio.value = anios.includes(anioActualStr) ? anioActualStr : "todos";
   }
   const selMes = document.getElementById("cronograma-tab-mes");
   if (selMes.options.length === 0) {
@@ -2931,7 +2959,7 @@ function renderAll() {
     const totalPend = pendientesGlobal.reduce((s, y) => s + y.monto, 0);
     avisoEl.hidden = false;
     avisoEl.textContent = rol.tipo === "hermano"
-      ? `Tienes ${pendientesGlobal.length} pago(s) tuyo(s) por verificar (${formatSoles(totalPend)}) — tócalo para verlos`
+      ? `Tienes ${pendientesGlobal.length} aporte(s) tuyo(s) esperando que el Administrador los verifique (${formatSoles(totalPend)}) — toca para revisarlos`
       : `Hay ${pendientesGlobal.length} pago(s) pendiente(s) por verificar (${formatSoles(totalPend)}) — toca para verlos`;
     avisoEl.onclick = () => {
       document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
