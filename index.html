@@ -465,6 +465,10 @@
               <input id="yape-imagen" type="file" accept="image/*,application/pdf" />
               <button type="button" id="yape-leer-imagen-btn" class="export-btn" style="margin-top:6px;font-size:11px;">🔍 Leer datos de la imagen</button>
               <span id="yape-imagen-hint" style="font-size:11px;color:#3D6B54;"></span>
+              <div id="yape-ocr-debug" hidden style="margin-top:6px;background:#FDECEA;border:1px solid #E8C0BA;border-radius:6px;padding:8px;">
+                <div style="font-size:10px;color:#8B241A;margin-bottom:4px;">No encontré el monto — copia este texto y compártelo para ajustar la lectura:</div>
+                <textarea id="yape-ocr-debug-texto" readonly onclick="this.select()" style="width:100%;font-size:10px;font-family:monospace;height:70px;border:1px solid #E8C0BA;border-radius:4px;padding:4px;"></textarea>
+              </div>
             </div>
           </div>
           <div class="form-row">
@@ -1278,9 +1282,17 @@ function buscarCercaDeEtiqueta(texto, etiquetaRegex, valorRegex, ventana) {
 function extraerDatosDeTexto(texto) {
   const resultado = { monto: null, fecha: null, numeroOperacion: null, numeroCuota: null, medioPago: null, motivo: null };
 
-  // Monto: el primer "S/ 255.00" o "S/100" (con o sin decimales) que aparezca
-  const matchMonto = texto.match(/S\/\.?\s*(\d[\d,]*(?:\.\d{1,2})?)/);
-  if (matchMonto) resultado.monto = matchMonto[1].replace(/,/g, "");
+  // Monto: intenta varias formas, de la más específica a la más flexible —
+  // el número grande y estilizado de Yape a veces confunde al lector y se
+  // come el "S/" o mete espacios raros entre dígitos.
+  let matchMonto = texto.match(/S\/\.?\s*(\d[\d,]*(?:\.\d{1,2})?)/);
+  if (!matchMonto) matchMonto = texto.match(/S\s*\/?\s*\.?\s*(\d[\d,\s]{0,7}\d(?:\.\d{1,2})?)/);
+  if (!matchMonto) {
+    // Respaldo específico de Yape: el monto viene justo debajo de "¡Yapeaste!"
+    const cercaDeYapeaste = buscarCercaDeEtiqueta(texto, /yapeaste/i, /(\d[\d,\s]{0,7}\d(?:\.\d{1,2})?)/, 25);
+    if (cercaDeYapeaste) matchMonto = [null, cercaDeYapeaste];
+  }
+  if (matchMonto) resultado.monto = matchMonto[1].replace(/[,\s]/g, "");
 
   // Fecha tipo "29 May 2026" o "29 jul. 2026"
   const matchFechaTexto = texto.match(/(\d{1,2})\s*([A-Za-zñÑ]{3,})\.?\s*(\d{4})/);
@@ -1371,6 +1383,12 @@ document.getElementById("yape-leer-imagen-btn").addEventListener("click", async 
       ? `🔍 Se leyó: ${encontrados.join(", ")} — revisa que esté correcto antes de guardar.`
       : "🔍 No se pudo identificar ningún dato en la imagen — complétalo a mano.";
     document.getElementById("yape-imagen-hint").style.color = encontrados.length ? "#8A5A2B" : "#C0392B";
+    if (!datos.monto) {
+      document.getElementById("yape-ocr-debug").hidden = false;
+      document.getElementById("yape-ocr-debug-texto").value = data.text;
+    } else {
+      document.getElementById("yape-ocr-debug").hidden = true;
+    }
   } catch (e) {
     showError("No se pudo leer la imagen. Complétalo a mano.");
   } finally {
