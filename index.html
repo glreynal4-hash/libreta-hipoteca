@@ -1263,14 +1263,26 @@ function renderTabsDinamicas() {
 const MESES_ABREV = { ene: 1, feb: 2, mar: 3, abr: 4, may: 5, jun: 6, jul: 7, ago: 8, sep: 9, set: 9, oct: 10, nov: 11, dic: 12 };
 
 // Intenta encontrar monto, fecha y N° de operación en el texto leído de una constancia.
-function extraerDatosDeTexto(texto) {
-  const resultado = { monto: null, fecha: null, numeroOperacion: null, numeroCuota: null };
+// Busca una etiqueta con una expresión regular, y dentro de los siguientes
+// caracteres busca el valor — mucho más tolerante a que el OCR meta saltos
+// de línea o espacios raros entre la etiqueta y su valor.
+function buscarCercaDeEtiqueta(texto, etiquetaRegex, valorRegex, ventana) {
+  const m = texto.match(etiquetaRegex);
+  if (!m) return null;
+  const desde = m.index + m[0].length;
+  const fragmento = texto.slice(desde, desde + (ventana || 40));
+  const mv = fragmento.match(valorRegex);
+  return mv ? mv[1] : null;
+}
 
-  // Monto: el primer "S/ 255.00" que aparezca (normalmente es el monto principal)
-  const matchMonto = texto.match(/S\/\.?\s*(\d[\d,]*\.\d{2})/);
+function extraerDatosDeTexto(texto) {
+  const resultado = { monto: null, fecha: null, numeroOperacion: null, numeroCuota: null, medioPago: null, motivo: null };
+
+  // Monto: el primer "S/ 255.00" o "S/100" (con o sin decimales) que aparezca
+  const matchMonto = texto.match(/S\/\.?\s*(\d[\d,]*(?:\.\d{1,2})?)/);
   if (matchMonto) resultado.monto = matchMonto[1].replace(/,/g, "");
 
-  // Fecha tipo "29 May 2026"
+  // Fecha tipo "29 May 2026" o "29 jul. 2026"
   const matchFechaTexto = texto.match(/(\d{1,2})\s*([A-Za-zñÑ]{3,})\.?\s*(\d{4})/);
   if (matchFechaTexto) {
     const mesTexto = matchFechaTexto[2].toLowerCase().slice(0, 3);
@@ -1287,22 +1299,34 @@ function extraerDatosDeTexto(texto) {
     if (matchFechaBarras) resultado.fecha = `${matchFechaBarras[3]}-${matchFechaBarras[2]}-${matchFechaBarras[1]}`;
   }
 
-  // N° de operación / código de operación
-  const matchOperacion = texto.match(/(?:c[oó]digo\s*de\s*)?operaci[oó]n[:\s]*([0-9]{5,})/i);
-  if (matchOperacion) resultado.numeroOperacion = matchOperacion[1];
+  // N° de operación — busca "operación" (Código de operación, Nro. de
+  // operación, etc.) y agarra los primeros 5+ dígitos que aparezcan después.
+  resultado.numeroOperacion = buscarCercaDeEtiqueta(texto, /operaci[oó]n/i, /(\d{5,})/, 40);
 
-  // N° de Cuota: si la constancia lo dice directo ("Cuota N° 53")...
-  const matchCuotaDirecta = texto.match(/cuota\s*n[°ºo]?\s*[:\s]\s*(\d{1,3})\b/i);
+  // Medio de pago: se reconoce por el estilo de la constancia
+  const esYape = /yape/i.test(texto);
+  const esPlin = /plin/i.test(texto);
+  const esInterbank = /interbank|cuenta\s*cargo/i.test(texto);
+  if (esYape) resultado.medioPago = "yape";
+  else if (esPlin) resultado.medioPago = "plin";
+  else if (esInterbank) resultado.medioPago = "transferencia";
+
+  // Tipo de operación (motivo): según lo que diga la constancia de Interbank
+  if (/reducci[oó]n\s*de\s*importe\s*de\s*cuotas/i.test(texto)) resultado.motivo = "reduccion_cuota";
+  else if (/reducci[oó]n\s*de\s*cantidad\s*de\s*cuotas/i.test(texto)) resultado.motivo = "reduccion_plazo";
+  else if (/^\s*pagaste/im.test(texto) || /\bcuota\s+0*\d{1,3}\s*:/i.test(texto)) resultado.motivo = "cuota_mensual";
+
+  // N° de Cuota:
+  // 1) directo, tipo "Cuota 059:" (constancia de pago de cuota mensual)
+  const matchCuotaDirecta = texto.match(/\bcuota\s+0*(\d{1,3})\s*:/i);
   if (matchCuotaDirecta) {
     resultado.numeroCuota = matchCuotaDirecta[1];
   } else {
-    // ...o si no, se calcula desde "Cuotas pendientes: NN cuotas" (dato que
-    // sí traen los comprobantes de prepago de Interbank).
-    const matchPendientes = texto.match(/cuotas?\s*pendientes?[:\s]*(\d{1,3})/i);
-    if (matchPendientes) {
-      const pendientes = Number(matchPendientes[1]);
+    // 2) calculado desde "Cuotas pendientes: NN cuotas" (prepagos de plazo)
+    const pendientes = buscarCercaDeEtiqueta(texto, /cuotas?\s*pendientes?/i, /(\d{1,3})/, 20);
+    if (pendientes) {
       const plazoTotal = config.plazoTotalMeses || 120;
-      const calculada = plazoTotal - pendientes;
+      const calculada = plazoTotal - Number(pendientes);
       if (calculada >= 1 && calculada <= plazoTotal) resultado.numeroCuota = String(calculada);
     }
   }
@@ -1329,6 +1353,12 @@ document.getElementById("yape-leer-imagen-btn").addEventListener("click", async 
     if (datos.monto) { document.getElementById("yape-monto").value = datos.monto; encontrados.push("monto"); }
     if (datos.fecha) { document.getElementById("yape-fecha-pago").value = datos.fecha; encontrados.push("fecha"); }
     if (datos.numeroOperacion) { document.getElementById("yape-num-operacion").value = datos.numeroOperacion; encontrados.push("N° de constancia"); }
+    if (datos.medioPago) { document.getElementById("yape-medio").value = datos.medioPago; encontrados.push("medio de pago"); }
+    if (datos.motivo) {
+      document.getElementById("yape-motivo").value = datos.motivo;
+      encontrados.push("tipo de operación");
+      intentarNotaAutomatica();
+    }
     if (datos.numeroCuota) {
       const selCuota = document.getElementById("yape-num-cuota");
       poblarSelectCuota(selCuota, true);
