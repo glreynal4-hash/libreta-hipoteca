@@ -389,6 +389,7 @@
         <span id="tabs-dinamicas" style="display:inline-flex;gap:6px;flex-wrap:wrap;"></span>
         <button class="tab-btn" data-tab="banco" id="tab-btn-banco">🏦 Pagos al Banco</button>
         <button class="tab-btn" data-tab="reportes" id="tab-btn-reportes">📈 Reportes</button>
+        <button class="tab-btn" data-tab="cronograma" id="tab-btn-cronograma">📜 Cronograma</button>
       </div>
 
       <!-- YAPES TAB -->
@@ -512,6 +513,13 @@
             <option value="cuota_desc">N° Cuota: mayor a menor</option>
             <option value="cuota_asc">N° Cuota: menor a mayor</option>
           </select>
+        </div>
+        <div class="ledger" id="yapes-ledger"></div>
+        <div class="paginacion" style="flex-wrap:wrap;gap:10px;">
+          <div id="yapes-sumatorio" style="font-size:12px;color:var(--muted);flex-basis:100%;"></div>
+          <button id="yapes-pag-prev">‹ Anterior</button>
+          <span id="yapes-pag-info"></span>
+          <button id="yapes-pag-next">Siguiente ›</button>
           <select id="filtro-yape-porpagina">
             <option value="10">10 por página</option>
             <option value="20">20 por página</option>
@@ -519,13 +527,6 @@
             <option value="100">100 por página</option>
             <option value="9999">Todos</option>
           </select>
-        </div>
-        <div id="yapes-sumatorio" style="font-size:12px;color:var(--muted);margin-bottom:8px;"></div>
-        <div class="ledger" id="yapes-ledger"></div>
-        <div class="paginacion">
-          <button id="yapes-pag-prev">‹ Anterior</button>
-          <span id="yapes-pag-info"></span>
-          <button id="yapes-pag-next">Siguiente ›</button>
         </div>
       </div>
 
@@ -624,6 +625,13 @@
             <option value="cuota_desc">N° Cuota: mayor a menor</option>
             <option value="cuota_asc">N° Cuota: menor a mayor</option>
           </select>
+        </div>
+        <div class="ledger" id="banco-ledger"></div>
+        <div class="paginacion" style="flex-wrap:wrap;gap:10px;">
+          <div id="banco-sumatorio" style="font-size:12px;color:var(--muted);flex-basis:100%;"></div>
+          <button id="banco-pag-prev">‹ Anterior</button>
+          <span id="banco-pag-info"></span>
+          <button id="banco-pag-next">Siguiente ›</button>
           <select id="filtro-banco-porpagina">
             <option value="10">10 por página</option>
             <option value="20">20 por página</option>
@@ -631,13 +639,6 @@
             <option value="100">100 por página</option>
             <option value="9999">Todos</option>
           </select>
-        </div>
-        <div id="banco-sumatorio" style="font-size:12px;color:var(--muted);margin-bottom:8px;"></div>
-        <div class="ledger" id="banco-ledger"></div>
-        <div class="paginacion">
-          <button id="banco-pag-prev">‹ Anterior</button>
-          <span id="banco-pag-info"></span>
-          <button id="banco-pag-next">Siguiente ›</button>
         </div>
       </div>
 
@@ -726,6 +727,19 @@
           <div id="validacion-resumen" style="margin-bottom:14px;"></div>
           <div id="validacion-tabla" style="overflow-x:auto;"></div>
         </div>
+      </div>
+
+      <!-- CRONOGRAMA (solo lectura, solo Administrador) -->
+      <div id="tab-cronograma" hidden>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">
+          📜 Datos oficiales de Interbank, tal cual el cronograma real — solo consulta, nada se puede editar aquí.
+        </div>
+        <div class="filtros-row">
+          <select id="cronograma-tab-anio"></select>
+          <select id="cronograma-tab-mes"></select>
+        </div>
+        <div id="cronograma-tab-resumen" style="margin-bottom:14px;"></div>
+        <div id="cronograma-tab-tabla" style="overflow-x:auto;"></div>
       </div>
 
       <div class="footer">Datos privados de acceso individual con usuario y clave.</div>
@@ -851,7 +865,7 @@ let editingConfig = false;
 let rol = null; // { tipo: "hermano", hermanoIdx: 0 } | { tipo: "encargado" }
 let yapesPageSize = 10;
 let bancoPageSize = 10;
-let yapesFiltro = { estado: "pendiente", hermano: "todos", anio: "todos", mes: "todos", tipoMov: "todos", desde: "", hasta: "", numero: "", numConst: "", numCuota: "", orden: "fecha_desc" };
+let yapesFiltro = { estado: "pendiente", hermano: "todos", anio: String(new Date().getFullYear()), mes: "todos", tipoMov: "todos", desde: "", hasta: "", numero: "", numConst: "", numCuota: "", orden: "fecha_desc" };
 let yapesPagina = 1;
 let vistaAdminAportes = "todos"; // "todos" | "0" | "1" | "2"... (índice de la persona cuya pestaña está activa)
 let tabsAbiertas = []; // índices de personas con una pestaña dinámica abierta
@@ -862,7 +876,7 @@ let ultimoReporteFecha = { filtrado: [], total: 0, totalVerificado: 0 };
 let ultimoReportePagosBanco = { filtrado: [], total: 0, totalCapital: 0, totalInteres: 0 };
 let historialCronograma = [];
 let historialCuota = [];
-let bancoFiltro = { anio: "todos", mes: "todos", tipoMov: "todos", desde: "", hasta: "", numero: "", numOp: "", numCuota: "", orden: "fecha_desc" };
+let bancoFiltro = { anio: String(new Date().getFullYear()), mes: "todos", tipoMov: "todos", desde: "", hasta: "", numero: "", numOp: "", numCuota: "", orden: "fecha_desc" };
 let bancoPagina = 1;
 
 function cargarRol() {
@@ -880,6 +894,7 @@ function guardarRol(nuevoRol, persistir) {
 function aplicarRol() {
   const esHermano = rol && rol.tipo === "hermano";
   document.getElementById("tab-btn-banco").hidden = esHermano;
+  document.getElementById("tab-btn-cronograma").hidden = esHermano;
   document.getElementById("edit-config-btn").hidden = esHermano;
   document.getElementById("herramientas-toggle-btn").hidden = esHermano;
   document.getElementById("herramientas-panel").hidden = true; // siempre arranca cerrado
@@ -890,6 +905,8 @@ function aplicarRol() {
     ? `Cuenta: ${nombreActual()}`
     : `Administrador: ${nombreActual()}`;
   document.getElementById("tab-btn-yapes").textContent = esHermano ? "📱 Mis Aportes" : "📊 Todos los Aportes";
+  yapesFiltro.estado = esHermano ? "todos" : "pendiente";
+  document.getElementById("filtro-yape-estado").value = yapesFiltro.estado;
   if (esHermano) {
     vistaAdminAportes = "todos";
     tabsAbiertas = [];
@@ -897,6 +914,7 @@ function aplicarRol() {
     document.getElementById("tab-yapes").hidden = false;
     document.getElementById("tab-banco").hidden = true;
     document.getElementById("tab-reportes").hidden = true;
+    document.getElementById("tab-cronograma").hidden = true;
     // Si por alguna razón quedaron activas las sub-pestañas restringidas, forzar "Listado General"
     document.querySelectorAll(".subtab-btn").forEach((b) => b.classList.remove("active"));
     document.getElementById("subtab-btn-listado").classList.add("active");
@@ -912,6 +930,7 @@ function aplicarRol() {
     document.getElementById("tab-yapes").hidden = false;
     document.getElementById("tab-banco").hidden = true;
     document.getElementById("tab-reportes").hidden = true;
+    document.getElementById("tab-cronograma").hidden = true;
     document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
     document.getElementById("tab-btn-yapes").classList.add("active");
     renderTabsDinamicas();
@@ -1166,6 +1185,7 @@ document.querySelectorAll(".tab-btn").forEach((btn) => {
     document.getElementById("tab-yapes").hidden = tab !== "yapes";
     document.getElementById("tab-banco").hidden = tab !== "banco";
     document.getElementById("tab-reportes").hidden = tab !== "reportes";
+    document.getElementById("tab-cronograma").hidden = tab !== "cronograma";
     vistaAdminAportes = "todos";
     yapesPagina = 1;
     renderTabsDinamicas();
@@ -1181,6 +1201,7 @@ function abrirTabPersona(idx) {
   document.getElementById("tab-yapes").hidden = false;
   document.getElementById("tab-banco").hidden = true;
   document.getElementById("tab-reportes").hidden = true;
+  document.getElementById("tab-cronograma").hidden = true;
   document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
   yapesPagina = 1;
   renderTabsDinamicas();
@@ -1212,6 +1233,7 @@ function renderTabsDinamicas() {
       document.getElementById("tab-yapes").hidden = false;
       document.getElementById("tab-banco").hidden = true;
       document.getElementById("tab-reportes").hidden = true;
+      document.getElementById("tab-cronograma").hidden = true;
       document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
       yapesPagina = 1;
       renderTabsDinamicas();
@@ -1657,15 +1679,44 @@ document.getElementById("excepcion-add-btn").addEventListener("click", async () 
 
 // ---------- CARGA HISTÓRICA 2025 (Cristian + Gustavo, una sola vez) ----------
 document.getElementById("cargar-historico-2025-btn").addEventListener("click", async () => {
-  const confirmado = await mostrarConfirmacion(
-    "Cargar histórico 2025",
-    "Esto va a crear 24 registros nuevos (12 de Cristian + 12 de Gustavo, cuotas 41 a 52 de 2025), ya marcados como Verificado. No lo ejecutes dos veces o se van a duplicar. ¿Confirmas?",
-    "Sí, cargar los 24"
+  const idxCristian0 = NOMBRES_HERMANOS.indexOf("Cristian Reyna");
+  const idxGustavo0 = IDX_ADMIN_APORTANTE;
+  const cuotasDelLote = ["41", "42", "43", "44", "45", "46", "47", "48", "49", "50", "51", "52"];
+  const existentes = yapes.filter((y) =>
+    (y.hermano === idxCristian0 || y.hermano === idxGustavo0) && cuotasDelLote.includes(String(y.numeroCuota))
   );
-  if (!confirmado) return;
+
+  let borrarPrimero = false;
+  if (existentes.length > 0) {
+    const confirmadoRegenerar = await mostrarConfirmacion(
+      "Ya existe este histórico",
+      `Ya hay ${existentes.length} registro(s) del histórico 2025 (Cristian/Gustavo, cuotas 41-52). ¿Quieres borrarlos y volver a generarlos desde cero?`,
+      "Sí, borrar y regenerar"
+    );
+    if (!confirmadoRegenerar) return;
+    borrarPrimero = true;
+  } else {
+    const confirmado = await mostrarConfirmacion(
+      "Cargar histórico 2025",
+      "Esto va a crear 24 registros nuevos (12 de Cristian + 12 de Gustavo, cuotas 41 a 52 de 2025), marcados como Pendiente para que los verifiques tú. ¿Confirmas?",
+      "Sí, cargar los 24"
+    );
+    if (!confirmado) return;
+  }
 
   const btn = document.getElementById("cargar-historico-2025-btn");
   btn.disabled = true;
+  btn.textContent = borrarPrimero ? "Borrando anteriores…" : "Cargando…";
+
+  if (borrarPrimero) {
+    for (const ex of existentes) {
+      try {
+        await deleteDoc(doc(db, "yapes", ex.id));
+        if (ex.imagenNombre) await borrarConstancia(ex.imagenNombre);
+      } catch (e) { /* seguimos con los demás aunque uno falle */ }
+    }
+  }
+
   btn.textContent = "Cargando…";
 
   // Cuota total fue S/1,131.08 todo 2025 (sin prepagos ese año) — Cristian
@@ -1706,7 +1757,7 @@ document.getElementById("cargar-historico-2025-btn").addEventListener("click", a
         imagenNombre: null,
         numero: numeroCristian,
         fechaRegistro: new Date().toISOString(),
-        estado: "verificado",
+        estado: "pendiente",
       });
 
       const numeroGustavo = await siguienteNumero("yapes");
@@ -1724,7 +1775,7 @@ document.getElementById("cargar-historico-2025-btn").addEventListener("click", a
         imagenNombre: null,
         numero: numeroGustavo,
         fechaRegistro: new Date().toISOString(),
-        estado: "verificado",
+        estado: "pendiente",
       });
     }
     btn.textContent = "✓ 24 registros cargados";
@@ -2003,9 +2054,122 @@ function renderValidacion() {
       <thead><tr><th>N°</th><th>Fecha</th><th style="text-align:right;">Amort.</th><th style="text-align:right;">Interés</th><th style="text-align:right;">Seguro</th><th style="text-align:right;">Esperado</th><th style="text-align:right;">Registrado</th><th>Estado</th></tr></thead>
       <tbody>${filasHtml || `<tr><td colspan="8" class="empty">Sin cuotas en este rango.</td></tr>`}</tbody>
     </table>`;
+
+  // ---- Prepagos reales confirmados por Interbank, dentro del mismo rango ----
+  const prepagosEnRango = PREPAGOS_REALES.filter((p) => {
+    const periodo = p.fecha.slice(0, 7);
+    return periodo >= periodoDesde && periodo <= periodoHasta;
+  });
+  const filasPrepagos = prepagosEnRango.map((p) => {
+    const t = CATEGORIAS[p.tipo] || CATEGORIAS.otros;
+    const coincide = pagosBanco.find((pb) =>
+      pb.fecha === p.fecha && Math.abs(pb.monto - p.monto) < 0.01 && (pb.tipo === p.tipo)
+    );
+    const estadoTexto = coincide
+      ? `<span style="color:var(--sage);">✅ Registrado (N° Registro ${formatNumero(coincide.numero)})</span>`
+      : `<span style="color:#C0392B;">⚠️ Sin registrar en Pagos al Banco</span>`;
+    return `<tr>
+      <td>${formatFecha(p.fecha)}</td>
+      <td>${t.label}</td>
+      <td style="text-align:right;">${formatSoles(p.amortizacion)}</td>
+      <td style="text-align:right;">${formatSoles(p.interes)}</td>
+      <td style="text-align:right;">${formatSoles(p.seguro)}</td>
+      <td style="text-align:right;font-weight:600;">${formatSoles(p.monto)}</td>
+      <td>${estadoTexto}</td>
+    </tr>`;
+  }).join("");
+
+  const totalPrepagosEsperado = prepagosEnRango.reduce((s, p) => s + p.monto, 0);
+  const prepagosSinRegistrar = prepagosEnRango.filter((p) =>
+    !pagosBanco.some((pb) => pb.fecha === p.fecha && Math.abs(pb.monto - p.monto) < 0.01 && pb.tipo === p.tipo)
+  ).length;
+
+  const htmlPrepagos = `
+    <div class="section-label" style="margin-top:18px;">💵 PREPAGOS REALES (confirmados por Interbank)</div>
+    <div class="hermano-card" style="margin-bottom:10px;">
+      <div class="hermano-nombre">Prepagos confirmados en este rango</div>
+      <div class="hermano-monto">${formatSoles(totalPrepagosEsperado)}</div>
+      <div class="hermano-desglose">${prepagosEnRango.length} prepago(s) del banco · ${prepagosSinRegistrar > 0 ? `⚠️ ${prepagosSinRegistrar} sin registrar todavía` : "✅ todos registrados"}</div>
+    </div>
+    <table class="reporte-table">
+      <thead><tr><th>Fecha</th><th>Tipo</th><th style="text-align:right;">Amort.</th><th style="text-align:right;">Interés</th><th style="text-align:right;">Seguro</th><th style="text-align:right;">Monto</th><th>Estado</th></tr></thead>
+      <tbody>${filasPrepagos || `<tr><td colspan="7" class="empty">Sin prepagos confirmados en este rango.</td></tr>`}</tbody>
+    </table>`;
+  document.getElementById("validacion-tabla").innerHTML += htmlPrepagos;
 }
 ["validacion-anio", "validacion-mes-desde", "validacion-mes-hasta"].forEach((id) => {
   document.addEventListener("change", (e) => { if (e.target.id === id) renderValidacion(); });
+});
+
+// ---------- PESTAÑA CRONOGRAMA (solo consulta) ----------
+function renderCronogramaTab() {
+  const selAnio = document.getElementById("cronograma-tab-anio");
+  if (selAnio.options.length === 0) {
+    const anios = Array.from(new Set(CRONOGRAMA_REAL.map((c) => c.fecha.slice(0, 4))));
+    selAnio.innerHTML = `<option value="todos">Todos los años</option>` + anios.map((a) => `<option value="${a}">${a}</option>`).join("");
+    selAnio.value = "todos";
+  }
+  const selMes = document.getElementById("cronograma-tab-mes");
+  if (selMes.options.length === 0) {
+    selMes.innerHTML = `<option value="todos">Todos los meses</option>` +
+      MESES_NOMBRE.map((m, i) => `<option value="${String(i + 1).padStart(2, "0")}">${m}</option>`).join("");
+    selMes.value = "todos";
+  }
+
+  const anio = selAnio.value || "todos";
+  const mes = selMes.value || "todos";
+
+  const cuotasFiltradas = CRONOGRAMA_REAL.filter((c) => {
+    if (anio !== "todos" && c.fecha.slice(0, 4) !== anio) return false;
+    if (mes !== "todos" && c.fecha.slice(5, 7) !== mes) return false;
+    return true;
+  });
+  const prepagosFiltrados = PREPAGOS_REALES.filter((p) => {
+    if (anio !== "todos" && p.fecha.slice(0, 4) !== anio) return false;
+    if (mes !== "todos" && p.fecha.slice(5, 7) !== mes) return false;
+    return true;
+  });
+
+  const totalCuotas = cuotasFiltradas.reduce((s, c) => s + c.cuotaTotal, 0);
+  const totalPrepagos = prepagosFiltrados.reduce((s, p) => s + p.monto, 0);
+  document.getElementById("cronograma-tab-resumen").innerHTML = `
+    <div class="hermano-card">
+      <div class="hermano-nombre">Cronograma oficial de Interbank — ${anio === "todos" ? "todos los años" : anio}${mes !== "todos" ? " · " + MESES_NOMBRE[Number(mes) - 1] : ""}</div>
+      <div class="hermano-monto">${formatSoles(totalCuotas + totalPrepagos)}</div>
+      <div class="hermano-desglose">${cuotasFiltradas.length} cuota(s) por ${formatSoles(totalCuotas)} · ${prepagosFiltrados.length} prepago(s) por ${formatSoles(totalPrepagos)}</div>
+    </div>`;
+
+  const filasCuotas = cuotasFiltradas.map((c) => `<tr>
+    <td>Cuota ${c.cuota}</td>
+    <td>${formatFecha(c.fecha)}</td>
+    <td>Cuota Mensual</td>
+    <td style="text-align:right;">${formatSoles(c.amortizacion)}</td>
+    <td style="text-align:right;">${formatSoles(c.interes)}</td>
+    <td style="text-align:right;">${formatSoles(c.seguro)}</td>
+    <td style="text-align:right;font-weight:600;">${formatSoles(c.cuotaTotal)}</td>
+  </tr>`);
+  const filasPrepagos = prepagosFiltrados.map((p) => {
+    const t = CATEGORIAS[p.tipo] || CATEGORIAS.otros;
+    return `<tr style="background:#FBF6EA;">
+      <td>—</td>
+      <td>${formatFecha(p.fecha)}</td>
+      <td>${t.label}</td>
+      <td style="text-align:right;">${formatSoles(p.amortizacion)}</td>
+      <td style="text-align:right;">${formatSoles(p.interes)}</td>
+      <td style="text-align:right;">${formatSoles(p.seguro)}</td>
+      <td style="text-align:right;font-weight:600;">${formatSoles(p.monto)}</td>
+    </tr>`;
+  });
+  const todasLasFilas = [...filasCuotas, ...filasPrepagos];
+
+  document.getElementById("cronograma-tab-tabla").innerHTML = `
+    <table class="reporte-table">
+      <thead><tr><th>N° Cuota</th><th>Fecha</th><th>Tipo</th><th style="text-align:right;">Amort.</th><th style="text-align:right;">Interés</th><th style="text-align:right;">Seguro</th><th style="text-align:right;">Total</th></tr></thead>
+      <tbody>${todasLasFilas.join("") || `<tr><td colspan="7" class="empty">Sin datos en este filtro.</td></tr>`}</tbody>
+    </table>`;
+}
+["cronograma-tab-anio", "cronograma-tab-mes"].forEach((id) => {
+  document.addEventListener("change", (e) => { if (e.target.id === id) renderCronogramaTab(); });
 });
 
 function periodoDe(y) {
@@ -2086,6 +2250,17 @@ const CRONOGRAMA_REAL = [
   {cuota:58,fecha:"2026-06-30",amortizacion:699.78,interes:383.64,seguro:14.83,cuotaTotal:1098.25},
   {cuota:59,fecha:"2026-07-30",amortizacion:699.57,interes:376.03,seguro:14.53,cuotaTotal:1090.13},
   {cuota:60,fecha:"2026-08-30",amortizacion:685.35,interes:380.81,seguro:14.72,cuotaTotal:1080.88}
+];
+// Prepagos REALES confirmados por Interbank (fijos, tal cual los comprobantes)
+const PREPAGOS_REALES = [
+  {fecha:"2026-02-02",tipo:"reduccion_cuota",amortizacion:118.61,interes:42.73,seguro:1.66,monto:163.00},
+  {fecha:"2026-03-02",tipo:"reduccion_cuota",amortizacion:300.84,interes:28.07,seguro:1.09,monto:330.00},
+  {fecha:"2026-03-31",tipo:"reduccion_cuota",amortizacion:285.68,interes:13.79,seguro:0.53,monto:300.00},
+  {fecha:"2026-05-04",tipo:"reduccion_cuota",amortizacion:318.67,interes:54.23,seguro:2.10,monto:375.00},
+  {fecha:"2026-05-29",tipo:"reduccion_plazo",amortizacion:255.00,interes:0.00,seguro:0.00,monto:255.00},
+  {fecha:"2026-06-01",tipo:"reduccion_cuota",amortizacion:217.49,interes:26.48,seguro:1.03,monto:245.00},
+  {fecha:"2026-07-01",tipo:"reduccion_cuota",amortizacion:386.48,interes:13.02,seguro:0.50,monto:400.00},
+  {fecha:"2026-07-31",tipo:"reduccion_cuota",amortizacion:436.76,interes:12.75,seguro:0.49,monto:450.00},
 ];
 const MESES_NOMBRE = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
@@ -2425,6 +2600,7 @@ function renderAll() {
       document.getElementById("tab-yapes").hidden = false;
       document.getElementById("tab-banco").hidden = true;
       document.getElementById("tab-reportes").hidden = true;
+      document.getElementById("tab-cronograma").hidden = true;
       vistaAdminAportes = "todos";
       yapesFiltro.estado = "pendiente";
       document.getElementById("filtro-yape-estado").value = "pendiente";
@@ -2452,7 +2628,7 @@ function renderAll() {
   // filtro por año (poblado con los años que ya tienen datos)
   const selFiltroAnio = document.getElementById("filtro-yape-anio");
   const aniosYapesDisponibles = Array.from(new Set(yapes.map((y) => periodoDe(y).slice(0, 4)).filter(Boolean))).sort();
-  const prevAnioYape = selFiltroAnio.value || "todos";
+  const prevAnioYape = selFiltroAnio.value || yapesFiltro.anio || "todos";
   selFiltroAnio.innerHTML = `<option value="todos">Todos los años</option>` + aniosYapesDisponibles.map((a) => `<option value="${a}">${a}</option>`).join("");
   selFiltroAnio.value = aniosYapesDisponibles.includes(prevAnioYape) ? prevAnioYape : "todos";
 
@@ -2577,7 +2753,7 @@ function renderAll() {
   // filtro por año (poblado con los años que ya tienen datos)
   const selFiltroBancoAnio = document.getElementById("filtro-banco-anio");
   const aniosBancoHistDisponibles = Array.from(new Set(pagosBanco.map((p) => (p.mesCorresponde || periodoBancoDe(p)).slice(0, 4)).filter(Boolean))).sort();
-  const prevAnioBancoHist = selFiltroBancoAnio.value || "todos";
+  const prevAnioBancoHist = selFiltroBancoAnio.value || bancoFiltro.anio || "todos";
   selFiltroBancoAnio.innerHTML = `<option value="todos">Todos los años</option>` + aniosBancoHistDisponibles.map((a) => `<option value="${a}">${a}</option>`).join("");
   selFiltroBancoAnio.value = aniosBancoHistDisponibles.includes(prevAnioBancoHist) ? prevAnioBancoHist : "todos";
 
@@ -2689,7 +2865,7 @@ function renderAll() {
   dibujarGraficoCuota();
   renderReporteListado();
   renderReporteFecha();
-  if (rol.tipo !== "hermano") { renderReportePagosBanco(); renderValidacion(); }
+  if (rol.tipo !== "hermano") { renderReportePagosBanco(); renderValidacion(); renderCronogramaTab(); }
 }
 
 // event delegation for ledger buttons
