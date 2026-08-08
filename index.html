@@ -494,9 +494,20 @@
                 <input type="checkbox" id="yape-generar-pago-check" style="width:auto;" />
                 Este aporte también generó un pago directo al banco
               </label>
-              <div id="yape-generar-pago-detalle" hidden style="margin-top:8px;">
-                <label class="field-label">Monto TOTAL pagado al banco (puede ser distinto a tu aporte)</label>
-                <input id="yape-generar-pago-monto" type="number" step="0.01" placeholder="Ej. 1131.08" />
+              <div id="yape-generar-pago-detalle" hidden style="margin-top:8px;display:flex;flex-direction:column;gap:8px;">
+                <div class="field-col">
+                  <label class="field-label">Monto TOTAL pagado al banco (puede ser distinto a tu aporte)</label>
+                  <input id="yape-generar-pago-monto" type="number" step="0.01" placeholder="Ej. 1131.08" />
+                </div>
+                <div class="field-col">
+                  <label class="field-label">N° de Operación del banco (opcional)</label>
+                  <input id="yape-generar-pago-num-op" type="text" placeholder="Ej. 3578349" />
+                </div>
+                <div class="field-col">
+                  <label class="field-label">Fecha de vencimiento de esa cuota (opcional)</label>
+                  <input id="yape-generar-pago-fecha-venc" type="date" />
+                </div>
+                <div style="font-size:11px;color:var(--muted);">El monto a capital no se pide aquí — lo puedes agregar después editando el pago generado.</div>
               </div>
               <div id="yape-generar-pago-bloqueado-hint" hidden style="font-size:11px;color:var(--muted);margin-top:4px;">Este aporte ya está vinculado a un pago — desvincúlalo primero (desde Pagos al Banco) si necesitas rehacerlo.</div>
             </div>
@@ -1296,16 +1307,11 @@ function buscarCercaDeEtiqueta(texto, etiquetaRegex, valorRegex, ventana) {
 function extraerDatosDeTexto(texto) {
   const resultado = { monto: null, fecha: null, numeroOperacion: null, numeroCuota: null, medioPago: null, motivo: null };
 
-  // Monto: intenta varias formas, de la más específica a la más flexible —
-  // el número grande y estilizado de Yape a veces confunde al lector y se
-  // come el "S/" o mete espacios raros entre dígitos.
+  // Monto: intenta 2 formas, ambas exigiendo que aparezca la "S" de "S/"
+  // cerca — nunca agarra un número suelto sin relación (como el día de la
+  // fecha), aunque eso signifique a veces no encontrar nada.
   let matchMonto = texto.match(/S\/\.?\s*(\d[\d,]*(?:\.\d{1,2})?)/);
   if (!matchMonto) matchMonto = texto.match(/S\s*\/?\s*\.?\s*(\d[\d,\s]{0,7}\d(?:\.\d{1,2})?)/);
-  if (!matchMonto) {
-    // Respaldo específico de Yape: el monto viene justo debajo de "¡Yapeaste!"
-    const cercaDeYapeaste = buscarCercaDeEtiqueta(texto, /yapeaste/i, /(\d[\d,\s]{0,7}\d(?:\.\d{1,2})?)/, 25);
-    if (cercaDeYapeaste) matchMonto = [null, cercaDeYapeaste];
-  }
   if (matchMonto) resultado.monto = matchMonto[1].replace(/[,\s]/g, "");
 
   // Fecha tipo "29 May 2026" o "29 jul. 2026"
@@ -1409,10 +1415,15 @@ document.getElementById("yape-leer-imagen-btn").addEventListener("click", async 
         encontrados.push("N° de cuota (revisa si es correcta)");
       }
     }
-    document.getElementById("yape-imagen-hint").textContent = encontrados.length
-      ? `🔍 Se leyó: ${encontrados.join(", ")} — revisa que esté correcto antes de guardar.`
-      : "🔍 No se pudo identificar ningún dato en la imagen — complétalo a mano.";
-    document.getElementById("yape-imagen-hint").style.color = encontrados.length ? "#8A5A2B" : "#C0392B";
+    let mensajeHint;
+    if (encontrados.length) {
+      mensajeHint = `🔍 Se leyó: ${encontrados.join(", ")}.`;
+      mensajeHint += datos.monto ? " Revisa que esté correcto antes de guardar." : " ⚠️ No encontré el monto — complétalo a mano.";
+    } else {
+      mensajeHint = "🔍 No se pudo identificar ningún dato en la imagen — complétalo a mano.";
+    }
+    document.getElementById("yape-imagen-hint").textContent = mensajeHint;
+    document.getElementById("yape-imagen-hint").style.color = (encontrados.length && datos.monto) ? "#8A5A2B" : "#C0392B";
     if (!datos.monto) {
       document.getElementById("yape-ocr-debug").hidden = false;
       document.getElementById("yape-ocr-debug-texto").value = data.text;
@@ -1605,16 +1616,18 @@ document.getElementById("yape-add-btn").addEventListener("click", async () => {
         const numeroPago = await siguienteNumero("banco");
         const refPago = await addDoc(collection(db, "pagosBanco"), {
           fecha: fechaPago,
-          fechaVencimiento: null,
+          fechaVencimiento: document.getElementById("yape-generar-pago-fecha-venc").value || null,
           mesCorresponde: mesCorresponde,
           monto: montoTotalPago,
           tipo: datos.motivo,
           montoCapital: null,
-          numeroOperacion: "",
+          numeroOperacion: document.getElementById("yape-generar-pago-num-op").value.trim(),
           numeroCuota: datos.numeroCuota,
           nota: `Generado automáticamente desde el aporte de ${NOMBRES_HERMANOS[hermanoIdx]}.`,
-          imagenUrl: null,
-          imagenNombre: null,
+          // Misma constancia física que el aporte (es el mismo pago) — se
+          // reutiliza el mismo archivo, no se vuelve a subir.
+          imagenUrl: datos.imagenUrl || null,
+          imagenNombre: datos.imagenNombre || null,
           imagenUrl2: null,
           imagenNombre2: null,
           numero: numeroPago,
@@ -1639,6 +1652,8 @@ document.getElementById("yape-add-btn").addEventListener("click", async () => {
         }
         document.getElementById("yape-generar-pago-check").checked = false;
         document.getElementById("yape-generar-pago-monto").value = "";
+        document.getElementById("yape-generar-pago-num-op").value = "";
+        document.getElementById("yape-generar-pago-fecha-venc").value = "";
         document.getElementById("yape-generar-pago-detalle").hidden = true;
       }
     }
